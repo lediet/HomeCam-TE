@@ -109,9 +109,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (_isDiscovering.value) return
         _isDiscovering.value = true
 
+        var discoveredCount = 0
+
         activeDiscovery?.stop()
         activeDiscovery = DiscoveryService(
             onDeviceFound = { device ->
+                discoveredCount++
                 viewModelScope.launch {
                     repository.saveDevice(device)
                     repository.connectDevice(device)
@@ -120,6 +123,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             onDiscoveryComplete = {
                 _isDiscovering.value = false
                 activeDiscovery = null
+                if (discoveredCount == 0) {
+                    _snackbarMessage.value = "未发现设备，请检查网络或手动添加"
+                } else {
+                    _snackbarMessage.value = "发现 $discoveredCount 台设备"
+                }
             }
         )
         activeDiscovery?.start()

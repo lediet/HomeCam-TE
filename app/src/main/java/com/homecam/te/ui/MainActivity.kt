@@ -70,6 +70,15 @@ fun HomecamTEApp() {
         viewModel.setFullscreen(null)
     }
 
+    // Collect snackbar messages from ViewModel
+    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSnackbar()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { scaffoldPadding ->

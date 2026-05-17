@@ -1,4 +1,4 @@
-# Homecam-TE v1.1.0
+# Homecam-TE v1.2.0
 
 HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeCam 设备的 MJPEG 视频流，支持事件监控、语音+振动报警和摄像头控制。
 
@@ -6,11 +6,12 @@ HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeC
 
 - **多设备监控** — 最多同时显示多台 HomeCam 设备，自适应网格布局（1 台单列，2+ 台双列）
 - **MJPEG 实时流** — 每设备独立连接，互不阻塞，9:16 竖屏比例 FIT_CENTER 显示
-- **UDP 自动发现** — 局域网广播自动搜索 HomeCam 设备
+- **UDP 自动发现** — 局域网广播自动搜索 HomeCam 设备（单 socket + 子网定向广播）
 - **事件追踪** — 轮询事件日志，增量更新，底部弹窗查看
 - **语音报警** — 中文 TTS 播报事件类型（进入/离开/哭声/睡眠）
 - **振动报警** — 不同事件不同振动时长
 - **摄像头控制** — 电源开关（MJPEG 自动刷新）、镜头切换（全屏 + 卡片左下角）
+- **设备编辑** — 长按卡片菜单编辑设备名称、IP 和端口
 - **全屏预览** — 点击卡片进入全屏模式
 - **设备持久化** — Room 数据库保存设备列表，启动自动恢复连接
 - **主页面滚动** — 多设备时支持纵向滚动查看
@@ -85,7 +86,7 @@ Homecam-TE 依赖 HomeCam 服务器端提供的 REST API：
 | `GET /api/camera/switch` | 切换摄像头镜头 |
 | `GET /api/camera/power` | 控制摄像头电源 |
 
-> v1.1.0 已移除 `/api/status` 轮询，改为 MJPEG 帧驱动在线状态。
+> v1.2.0 已修复 UDP 自动发现（单 socket 端口绑定 + 子网定向广播）。
 
 ## 项目结构
 
@@ -111,6 +112,7 @@ com.homecam.te/
     ├── MjpegView.kt        # MJPEG 渲染组件
     ├── EventSheet.kt       # 事件弹窗
     ├── AddCameraDialog.kt  # 添加对话框
+├── EditCameraDialog.kt # 编辑对话框
     ├── SettingsScreen.kt   # 设置页面
     └── theme/Theme.kt      # 主题
 ```

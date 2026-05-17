@@ -10,14 +10,9 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * UDP discovery service for finding HomeCam devices on the LAN.
- *
- * Broadcasts "HOMECAM_DISCOVER" on port 45678 and collects
- * "HOMECAM_RESPONSE|name|ip|port|id" responses for 3 seconds.
- */
 class DiscoveryService(
     private val onDeviceFound: (CameraDevice) -> Unit,
     private val onDiscoveryComplete: () -> Unit = {}
@@ -32,7 +27,7 @@ class DiscoveryService(
     companion object {
         private const val DISCOVER_PORT = 45678
         private const val COLLECT_DURATION_MS = 3000L
-        private const val BROADCAST_ATTEMPTS = 3
+        private const val BROADCAST_ATTEMPTS = 5
         private const val BUFFER_SIZE = 1024
         private const val DISCOVER_MSG = "HOMECAM_DISCOVER"
         private const val RESPONSE_PREFIX = "HOMECAM_RESPONSE"
@@ -41,8 +36,6 @@ class DiscoveryService(
     fun start() {
         if (!running.compareAndSet(false, true)) return
         seenDevices.clear()
-
-        // Acquire multicast lock for reliable UDP reception
         try {
             val wifi = HomeCamApp.instance.getSystemService(Context.WIFI_SERVICE) as WifiManager
             multicastLock = wifi.createMulticastLock("homecam-te-discovery")
@@ -51,11 +44,11 @@ class DiscoveryService(
         } catch (e: Exception) {
             Log.w(tag, "Cannot acquire multicast lock", e)
         }
-
+        val localIp = getLocalIpAddress()
+        Log.d(tag, "Local IP: $localIp")
         scope.launch {
             try {
-                broadcastDiscovery()
-                listenForResponses()
+                broadcastAndListen(localIp)
             } catch (e: Exception) {
                 Log.e(tag, "Discovery error", e)
             } finally {
@@ -72,59 +65,95 @@ class DiscoveryService(
         releaseMulticastLock()
     }
 
-    private fun broadcastDiscovery() {
-        val broadcastAddr = InetAddress.getByName("255.255.255.255")
-        val sendSocket = DatagramSocket()
-        sendSocket.broadcast = true
-
-        val sendData = DISCOVER_MSG.toByteArray(Charsets.UTF_8)
-        repeat(BROADCAST_ATTEMPTS) {
-            val packet = DatagramPacket(sendData, sendData.size, broadcastAddr, DISCOVER_PORT)
-            sendSocket.send(packet)
-            Thread.sleep(200)
-        }
-        sendSocket.close()
-        Log.d(tag, "Broadcast discovery message ($BROADCAST_ATTEMPTS times)")
-    }
-
-    private fun listenForResponses() {
-        val listenSocket = DatagramSocket(DISCOVER_PORT)
-        listenSocket.soTimeout = COLLECT_DURATION_MS.toInt()
-        listenSocket.broadcast = true
-
-        val buffer = ByteArray(BUFFER_SIZE)
-        val endTime = System.currentTimeMillis() + COLLECT_DURATION_MS
-
-        Log.d(tag, "Listening for responses on port $DISCOVER_PORT...")
-
-        while (System.currentTimeMillis() < endTime && running.get()) {
-            try {
-                val packet = DatagramPacket(buffer, buffer.size)
-                listenSocket.receive(packet)
-
-                val response = String(packet.data, packet.offset, packet.length, Charsets.UTF_8)
-                Log.d(tag, "Received: $response from ${packet.address.hostAddress ?: "unknown"}")
-
-                parseResponse(response, packet.address.hostAddress ?: "unknown")?.let { device ->
-                    if (seenDevices.add(device.id)) {
-                        Log.d(tag, "Discovered device: ${device.name} at ${device.ip}:${device.port}")
-                        onDeviceFound(device)
+    private fun broadcastAndListen(localIp: String?) {
+        val socket = DatagramSocket(DISCOVER_PORT)
+        try {
+            socket.broadcast = true
+            socket.soTimeout = COLLECT_DURATION_MS.toInt()
+            val buffer = ByteArray(BUFFER_SIZE)
+            val endTime = System.currentTimeMillis() + COLLECT_DURATION_MS
+            val broadcastAddrs = mutableListOf<InetAddress>()
+            broadcastAddrs.add(InetAddress.getByName("255.255.255.255"))
+            val subnetBroadcast = computeSubnetBroadcast(localIp)
+            if (subnetBroadcast != null && subnetBroadcast != "255.255.255.255") {
+                broadcastAddrs.add(InetAddress.getByName(subnetBroadcast))
+                Log.d(tag, "Also broadcasting to subnet: $subnetBroadcast")
+            }
+            val sendData = DISCOVER_MSG.toByteArray(Charsets.UTF_8)
+            Log.d(tag, "Broadcasting discovery message (${BROADCAST_ATTEMPTS} times to ${broadcastAddrs.size} addr(s))")
+            repeat(BROADCAST_ATTEMPTS) {
+                for (addr in broadcastAddrs) {
+                    try {
+                        val packet = DatagramPacket(sendData, sendData.size, addr, DISCOVER_PORT)
+                        socket.send(packet)
+                    } catch (e: Exception) {
+                        Log.w(tag, "Send to $addr failed", e)
                     }
                 }
-            } catch (e: java.net.SocketTimeoutException) {
-                break
-            } catch (e: Exception) {
-                Log.e(tag, "Listen error", e)
+                if (it < BROADCAST_ATTEMPTS - 1) {
+                    Thread.sleep(150)
+                }
             }
+            Log.d(tag, "Listening for responses on port $DISCOVER_PORT...")
+            while (System.currentTimeMillis() < endTime && running.get()) {
+                try {
+                    val packet = DatagramPacket(buffer, buffer.size)
+                    socket.receive(packet)
+                    val fromAddr = packet.address.hostAddress ?: "unknown"
+                    // Skip our own broadcast echo
+                    if (fromAddr == localIp) continue
+                    val fromPort = packet.port
+                    val response = String(packet.data, packet.offset, packet.length, Charsets.UTF_8)
+                    Log.d(tag, "Received: $response from ${fromAddr}:${fromPort}")
+                    parseResponse(response, fromAddr)?.let { device ->
+                        if (seenDevices.add(device.id)) {
+                            Log.d(tag, "Discovered device: ${device.name} at ${device.ip}:${device.port}")
+                            onDeviceFound(device)
+                        }
+                    }
+                } catch (e: SocketTimeoutException) {
+                    break
+                } catch (e: Exception) {
+                    Log.e(tag, "Listen error", e)
+                }
+            }
+            Log.d(tag, "Discovery finished, ${seenDevices.size} device(s) found")
+        } finally {
+            socket.close()
         }
+    }
 
-        listenSocket.close()
-        Log.d(tag, "Discovery finished, ${seenDevices.size} device(s) found")
+    private fun computeSubnetBroadcast(localIp: String?): String? {
+        if (localIp == null) return null
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val nif = interfaces.nextElement()
+                if (nif.isLoopback || !nif.isUp) continue
+                for (addr in nif.interfaceAddresses) {
+                    if (addr.address is java.net.Inet4Address) {
+                        val ip = addr.address.hostAddress
+                        if (ip == localIp) {
+                            val broadcast = addr.broadcast
+                            if (broadcast != null) {
+                                return broadcast.hostAddress
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to compute subnet broadcast", e)
+        }
+        return null
     }
 
     private fun parseResponse(response: String, sourceIp: String): CameraDevice? {
         val parts = response.trim().split("|")
-        if (parts.size < 5 || parts[0] != RESPONSE_PREFIX) return null
+        if (parts.size < 5 || parts[0] != RESPONSE_PREFIX) {
+            Log.w(tag, "Ignored malformed response: $response")
+            return null
+        }
         return CameraDevice(
             id = parts[4].trim(),
             name = parts[1].trim(),
