@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class EventPoller(
     private val apiClient: ApiClient,
     private val onNewEvents: (List<EventItem>) -> Unit,
-    private val onError: (Exception) -> Unit = {}
+    private val onError: (Throwable) -> Unit = {}
 ) {
 
     private var job: Job? = null

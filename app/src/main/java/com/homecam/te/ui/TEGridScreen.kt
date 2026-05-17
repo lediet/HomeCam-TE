@@ -1,5 +1,6 @@
 package com.homecam.te.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -15,31 +16,18 @@ import com.homecam.te.data.CameraRepository
 import com.homecam.te.model.CameraState
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Main grid screen that displays camera cards in adaptive layout.
- *
- * Grid rules:
- *   1 device  -> 1 column
- *   2 devices -> 1 column (vertical)
- *   3 devices -> 2 columns (first 2 side-by-side, 3rd spans full)
- *   4 devices -> 2 columns (2x2)
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TEGridScreen(
     cameraStates: Map<String, CameraState>,
     repository: CameraRepository,
     isDiscovering: Boolean,
-    fullscreenDeviceId: String?,
-    settings: AlertSettings,
     onAddClick: () -> Unit,
     onDiscoveryClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onSetFullscreen: (String?) -> Unit,
     onShowEvents: (String) -> Unit,
-    onRemoveDevice: (String) -> Unit,
-    onSetPower: (String, Boolean) -> Unit,
-    onSwitchCamera: (String, String, String) -> Unit,
+    onDeleteCamera: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val deviceCount = cameraStates.size
@@ -102,12 +90,9 @@ fun TEGridScreen(
             CameraGrid(
                 cameraStates = cameraStates.values.toList(),
                 repository = repository,
-                fullscreenDeviceId = fullscreenDeviceId,
                 onSetFullscreen = onSetFullscreen,
                 onShowEvents = onShowEvents,
-                onRemoveDevice = onRemoveDevice,
-                onSetPower = onSetPower,
-                onSwitchCamera = onSwitchCamera,
+                onDeleteCamera = onDeleteCamera,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -118,34 +103,13 @@ fun TEGridScreen(
 private fun CameraGrid(
     cameraStates: List<CameraState>,
     repository: CameraRepository,
-    fullscreenDeviceId: String?,
     onSetFullscreen: (String?) -> Unit,
     onShowEvents: (String) -> Unit,
-    onRemoveDevice: (String) -> Unit,
-    onSetPower: (String, Boolean) -> Unit,
-    onSwitchCamera: (String, String, String) -> Unit,
+    onDeleteCamera: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val count = cameraStates.size
-    val columns = when {
-        count <= 2 -> 1
-        else -> 2
-    }
-
-    if (fullscreenDeviceId != null) {
-        val state = cameraStates.find { it.device.id == fullscreenDeviceId }
-        if (state != null) {
-            FullscreenCamera(
-                cameraState = state,
-                frameFlow = repository.getFrameFlow(state.device.id),
-                onClose = { onSetFullscreen(null) },
-                onShowEvents = { onShowEvents(state.device.id) },
-                onSetPower = { on -> onSetPower(state.device.id, on) },
-                modifier = Modifier.fillMaxSize()
-            )
-            return
-        }
-    }
+    val columns = if (count <= 2) 1 else 2
 
     Column(modifier = modifier.padding(4.dp)) {
         var index = 0
@@ -158,7 +122,7 @@ private fun CameraGrid(
                         frameFlow = repository.getFrameFlow(state.device.id),
                         onFullscreen = { onSetFullscreen(state.device.id) },
                         onShowEvents = { onShowEvents(state.device.id) },
-                        onLongPress = { },
+                        onDelete = { onDeleteCamera(state.device.id) },
                         modifier = Modifier.weight(1f)
                     )
                     index++
@@ -170,7 +134,7 @@ private fun CameraGrid(
                             frameFlow = repository.getFrameFlow(state.device.id),
                             onFullscreen = { onSetFullscreen(state.device.id) },
                             onShowEvents = { onShowEvents(state.device.id) },
-                            onLongPress = { },
+                            onDelete = { onDeleteCamera(state.device.id) },
                             modifier = Modifier.weight(1f)
                         )
                         index++
@@ -182,7 +146,7 @@ private fun CameraGrid(
                             frameFlow = repository.getFrameFlow(state1.device.id),
                             onFullscreen = { onSetFullscreen(state1.device.id) },
                             onShowEvents = { onShowEvents(state1.device.id) },
-                            onLongPress = { },
+                            onDelete = { onDeleteCamera(state1.device.id) },
                             modifier = Modifier.weight(1f)
                         )
                         CameraCard(
@@ -190,7 +154,7 @@ private fun CameraGrid(
                             frameFlow = repository.getFrameFlow(state2.device.id),
                             onFullscreen = { onSetFullscreen(state2.device.id) },
                             onShowEvents = { onShowEvents(state2.device.id) },
-                            onLongPress = { },
+                            onDelete = { onDeleteCamera(state2.device.id) },
                             modifier = Modifier.weight(1f)
                         )
                         index += 2
@@ -201,44 +165,12 @@ private fun CameraGrid(
                             frameFlow = repository.getFrameFlow(state.device.id),
                             onFullscreen = { onSetFullscreen(state.device.id) },
                             onShowEvents = { onShowEvents(state.device.id) },
-                            onLongPress = { },
+                            onDelete = { onDeleteCamera(state.device.id) },
                             modifier = Modifier.weight(1f)
                         )
                         index++
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FullscreenCamera(
-    cameraState: CameraState,
-    frameFlow: StateFlow<ByteArray?>,
-    onClose: () -> Unit,
-    onShowEvents: () -> Unit,
-    onSetPower: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(modifier = modifier) {
-        MjpegView(
-            frameFlow = frameFlow,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp)
-        ) {
-            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "关闭全屏",
-                    modifier = Modifier.padding(4.dp)
-                )
             }
         }
     }

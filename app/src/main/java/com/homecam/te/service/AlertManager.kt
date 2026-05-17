@@ -2,22 +2,21 @@ package com.homecam.te.service
 
 import android.content.Context
 import android.media.AudioAttributes
-import android.media.AudioManager
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.tts.TextToSpeech
 import android.util.Log
-import java.util.Locale
 
 /**
- * Manages TTS voice alerts and vibration alerts for events.
+ * Manages sound and vibration alerts for events.
+ * Uses system notification sound (no TTS).
  */
 class AlertManager(private val context: Context) {
 
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
     private val tag = "AlertManager"
 
     // Alert settings (default: all enabled)
@@ -31,31 +30,14 @@ class AlertManager(private val context: Context) {
     var cryAlertEnabled = true
     var sleepAlertEnabled = true
 
-    init {
-        initTts()
-    }
-
-    private fun initTts() {
-        tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts?.language = Locale.CHINESE
-                ttsReady = true
-            } else {
-                Log.w(tag, "TTS initialization failed: status=$status")
-            }
-        }
-    }
-
     /**
      * Trigger alert for an event.
      */
     fun onEvent(type: String, label: String = "") {
         if (!alertEnabled) return
 
-        val eventText = getEventText(type, label) ?: return
-
-        if (voiceEnabled && ttsReady) {
-            speak(eventText)
+        if (voiceEnabled) {
+            playNotificationSound()
         }
 
         if (vibrateEnabled) {
@@ -63,22 +45,25 @@ class AlertManager(private val context: Context) {
         }
     }
 
-    private fun getEventText(type: String, label: String): String? {
-        return when (type) {
-            "enter" -> if (enterAlertEnabled) "有${label}进入了" else null
-            "leave" -> if (leaveAlertEnabled) "有${label}离开了" else null
-            "cry" -> if (cryAlertEnabled) "检测到婴儿哭声" else null
-            "sleep" -> if (sleepAlertEnabled) "宝宝睡着了" else null
-            "wake_up" -> if (sleepAlertEnabled) "宝宝睡醒了" else null
-            else -> null
-        }
-    }
-
-    private fun speak(text: String) {
+    private fun playNotificationSound() {
         try {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+            val uri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            MediaPlayer().apply {
+                setDataSource(context, uri)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setOnCompletionListener { it.release() }
+                setOnErrorListener { _, _, _ -> release(); true }
+                prepare()
+                start()
+            }
+            Log.d(tag, "Playing notification sound")
         } catch (e: Exception) {
-            Log.e(tag, "TTS speak error", e)
+            Log.e(tag, "Notification sound error", e)
         }
     }
 
@@ -106,8 +91,6 @@ class AlertManager(private val context: Context) {
     }
 
     fun release() {
-        tts?.stop()
-        tts?.shutdown()
-        tts = null
+        // nothing to release (no TTS)
     }
 }

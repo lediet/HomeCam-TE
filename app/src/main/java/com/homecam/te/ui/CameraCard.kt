@@ -5,8 +5,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,19 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.homecam.te.data.CameraRepository
 import com.homecam.te.model.CameraState
 import kotlinx.coroutines.flow.StateFlow
+import java.text.SimpleDateFormat
+import java.util.Date
 
-/**
- * Camera card displays MJPEG video + latest event + expand button.
- *
- * Click video -> fullscreen
- * Long press -> context menu (power/switch)
- * Click arrow -> event sheet
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CameraCard(
@@ -35,9 +30,11 @@ fun CameraCard(
     frameFlow: StateFlow<ByteArray?>,
     onFullscreen: () -> Unit,
     onShowEvents: () -> Unit,
-    onLongPress: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier
             .padding(4.dp)
@@ -46,42 +43,52 @@ fun CameraCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column {
-            // MJPEG Video area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .combinedClickable(
                         onClick = onFullscreen,
-                        onLongClick = onLongPress
+                        onLongClick = { showMenu = true }
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (cameraState.isOnline && cameraState.isPoweredOn) {
+                if (cameraState.isOnline) {
                     MjpegView(
                         frameFlow = frameFlow,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // Offline or powered off placeholder
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = if (!cameraState.isOnline) Icons.Default.Videocam else Icons.Default.PowerOff,
+                            imageVector = Icons.Default.Videocam,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
                             tint = Color.Gray
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = if (!cameraState.isOnline) "设备离线" else "摄像头已关闭",
-                            color = Color.Gray,
-                            fontSize = 14.sp
-                        )
+                        Text(text = "设备离线", color = Color.Gray, fontSize = 14.sp)
                     }
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    offset = DpOffset(8.dp, 0.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("删除设备", color = Color.Red) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
+                        },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        }
+                    )
                 }
             }
 
-            // Status bar
             StatusBar(
                 cameraState = cameraState,
                 onExpand = onShowEvents,
@@ -108,20 +115,14 @@ private fun StatusBar(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Online indicator
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .padding(end = 6.dp)
-            ) {
-                Surface(
-                    modifier = Modifier.size(8.dp),
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (cameraState.isOnline) Color(0xFF4CAF50) else Color.Gray
-                ) {}
-            }
+            Surface(
+                modifier = Modifier.size(8.dp),
+                shape = RoundedCornerShape(4.dp),
+                color = if (cameraState.isOnline) Color(0xFF4CAF50) else Color.Gray
+            ) {}
 
-            // Device name
+            Spacer(Modifier.width(8.dp))
+
             Text(
                 text = cameraState.device.name,
                 fontSize = 12.sp,
@@ -131,14 +132,12 @@ private fun StatusBar(
                 modifier = Modifier.weight(1f)
             )
 
-            // Latest event or placeholder
             if (cameraState.latestEvent != null) {
+                val timeStr = remember(cameraState.latestEventTime) {
+                    SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(Date(cameraState.latestEventTime))
+                }
                 Text(
-                    text = cameraState.latestEventLabel.ifEmpty {
-                        formatEventDisplay(cameraState.latestEvent)
-                    }.let { label ->
-                        if (label.isNotEmpty()) label else cameraState.latestEvent ?: ""
-                    },
+                    text = "${formatEventShort(cameraState.latestEvent, cameraState.latestEventLabel)} $timeStr",
                     fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -154,14 +153,10 @@ private fun StatusBar(
                 )
             }
 
-            // Expand button
-            IconButton(
-                onClick = onExpand,
-                modifier = Modifier.size(24.dp)
-            ) {
+            IconButton(onClick = onExpand, modifier = Modifier.size(24.dp)) {
                 Icon(
                     imageVector = Icons.Default.ExpandMore,
-                    contentDescription = "展开事件",
+                    contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -169,14 +164,13 @@ private fun StatusBar(
     }
 }
 
-private fun formatEventDisplay(type: String): String {
+private fun formatEventShort(type: String, label: String): String {
     return when (type) {
-        "enter" -> "有人进入"
-        "leave" -> "有人离开"
+        "enter" -> "有${label}进入了"
+        "leave" -> "有${label}离开了"
         "cry" -> "婴儿哭声"
         "sleep" -> "宝宝睡着了"
         "wake_up" -> "宝宝睡醒了"
-        "motion" -> "画面变动"
         else -> type
     }
 }

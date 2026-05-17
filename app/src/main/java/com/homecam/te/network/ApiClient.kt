@@ -1,6 +1,7 @@
 package com.homecam.te.network
 
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import com.homecam.te.model.*
 import kotlinx.coroutines.Dispatchers
@@ -126,10 +127,16 @@ class ApiClient(private val baseUrl: String) {
 }
 
 data class EventResponseItem(
+    @SerializedName("fileName")
     val fileName: String = "",
+    @SerializedName("time")
     val timestamp: Long = 0L,
+    @SerializedName("type")
     val eventType: String = "",
+    @SerializedName("label")
     val label: String = "",
+    @SerializedName("durationSec")
     val durationSec: Int = 0,
+    @SerializedName("fileSize")
     val fileSize: Long = 0L
 )

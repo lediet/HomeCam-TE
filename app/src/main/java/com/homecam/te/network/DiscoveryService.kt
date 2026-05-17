@@ -1,6 +1,9 @@
 package com.homecam.te.network
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import android.util.Log
+import com.homecam.te.HomeCamApp
 import com.homecam.te.model.CameraDevice
 import kotlinx.coroutines.*
 import java.net.DatagramPacket
@@ -24,6 +27,7 @@ class DiscoveryService(
     private val running = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val seenDevices = HashSet<String>()
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     companion object {
         private const val DISCOVER_PORT = 45678
@@ -34,42 +38,56 @@ class DiscoveryService(
         private const val RESPONSE_PREFIX = "HOMECAM_RESPONSE"
     }
 
-    /** Start discovery: broadcast and collect responses */
     fun start() {
         if (!running.compareAndSet(false, true)) return
         seenDevices.clear()
 
+        // Acquire multicast lock for reliable UDP reception
+        try {
+            val wifi = HomeCamApp.instance.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            multicastLock = wifi.createMulticastLock("homecam-te-discovery")
+            multicastLock?.setReferenceCounted(false)
+            multicastLock?.acquire()
+        } catch (e: Exception) {
+            Log.w(tag, "Cannot acquire multicast lock", e)
+        }
+
         scope.launch {
             try {
-                // Broadcast discovery message
-                val broadcastAddr = InetAddress.getByName("255.255.255.255")
-                val sendSocket = DatagramSocket()
-                sendSocket.broadcast = true
-
-                val sendData = DISCOVER_MSG.toByteArray(Charsets.UTF_8)
-                repeat(BROADCAST_ATTEMPTS) {
-                    val packet = DatagramPacket(sendData, sendData.size, broadcastAddr, DISCOVER_PORT)
-                    sendSocket.send(packet)
-                    delay(200)
-                }
-                sendSocket.close()
-
-                Log.d(tag, "Broadcasted discovery message ($BROADCAST_ATTEMPTS times)")
-
-                // Listen for responses
+                broadcastDiscovery()
                 listenForResponses()
-
             } catch (e: Exception) {
                 Log.e(tag, "Discovery error", e)
             } finally {
+                releaseMulticastLock()
                 running.set(false)
                 onDiscoveryComplete()
             }
         }
     }
 
-    private suspend fun listenForResponses() {
-        // Find the local broadcast address to bind to
+    fun stop() {
+        running.set(false)
+        scope.cancel()
+        releaseMulticastLock()
+    }
+
+    private fun broadcastDiscovery() {
+        val broadcastAddr = InetAddress.getByName("255.255.255.255")
+        val sendSocket = DatagramSocket()
+        sendSocket.broadcast = true
+
+        val sendData = DISCOVER_MSG.toByteArray(Charsets.UTF_8)
+        repeat(BROADCAST_ATTEMPTS) {
+            val packet = DatagramPacket(sendData, sendData.size, broadcastAddr, DISCOVER_PORT)
+            sendSocket.send(packet)
+            Thread.sleep(200)
+        }
+        sendSocket.close()
+        Log.d(tag, "Broadcast discovery message ($BROADCAST_ATTEMPTS times)")
+    }
+
+    private fun listenForResponses() {
         val listenSocket = DatagramSocket(DISCOVER_PORT)
         listenSocket.soTimeout = COLLECT_DURATION_MS.toInt()
         listenSocket.broadcast = true
@@ -77,21 +95,24 @@ class DiscoveryService(
         val buffer = ByteArray(BUFFER_SIZE)
         val endTime = System.currentTimeMillis() + COLLECT_DURATION_MS
 
-        while (System.currentTimeMillis() < endTime) {
+        Log.d(tag, "Listening for responses on port $DISCOVER_PORT...")
+
+        while (System.currentTimeMillis() < endTime && running.get()) {
             try {
                 val packet = DatagramPacket(buffer, buffer.size)
                 listenSocket.receive(packet)
 
                 val response = String(packet.data, packet.offset, packet.length, Charsets.UTF_8)
-                Log.d(tag, "Received: $response from ${packet.address.hostAddress}")
+                Log.d(tag, "Received: $response from ${packet.address.hostAddress ?: "unknown"}")
 
-                parseResponse(response, packet.address.hostAddress)?.let { device ->
+                parseResponse(response, packet.address.hostAddress ?: "unknown")?.let { device ->
                     if (seenDevices.add(device.id)) {
+                        Log.d(tag, "Discovered device: ${device.name} at ${device.ip}:${device.port}")
                         onDeviceFound(device)
                     }
                 }
             } catch (e: java.net.SocketTimeoutException) {
-                break // Collection period ended
+                break
             } catch (e: Exception) {
                 Log.e(tag, "Listen error", e)
             }
@@ -101,13 +122,9 @@ class DiscoveryService(
         Log.d(tag, "Discovery finished, ${seenDevices.size} device(s) found")
     }
 
-    /**
-     * Parse "HOMECAM_RESPONSE|name|ip|port|id" into CameraDevice
-     */
     private fun parseResponse(response: String, sourceIp: String): CameraDevice? {
         val parts = response.trim().split("|")
         if (parts.size < 5 || parts[0] != RESPONSE_PREFIX) return null
-
         return CameraDevice(
             id = parts[4].trim(),
             name = parts[1].trim(),
@@ -118,12 +135,13 @@ class DiscoveryService(
         )
     }
 
-    fun stop() {
-        running.set(false)
-        scope.cancel()
+    private fun releaseMulticastLock() {
+        try {
+            multicastLock?.release()
+        } catch (_: Exception) { }
+        multicastLock = null
     }
 
-    /** Helper: get local IP address (wifi interface preferred) */
     fun getLocalIpAddress(): String? {
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
@@ -138,9 +156,7 @@ class DiscoveryService(
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.e(tag, "getLocalIpAddress error", e)
-        }
+        } catch (_: Exception) { }
         return null
     }
 }

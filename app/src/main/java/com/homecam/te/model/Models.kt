@@ -1,5 +1,7 @@
 package com.homecam.te.model
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * Local-stored camera device info (Room Entity)
  */
@@ -18,7 +20,7 @@ data class CameraDevice(
 data class CameraState(
     val device: CameraDevice,
     val isOnline: Boolean = false,
-    val isPoweredOn: Boolean = false,
+    val isPoweredOn: Boolean = true,
     val latestEvent: String? = null,
     val latestEventTime: Long = 0L,
     val latestEventLabel: String = "",
@@ -41,24 +43,33 @@ data class EventItem(
  * Camera info from GET /api/cameras
  */
 data class CameraInfo(
+    @SerializedName("cameraId")
     val cameraId: String,
+    @SerializedName("logicalCameraId")
     val logicalCameraId: String = "",
     val label: String = ""
 )
 
 /**
  * Status response from GET /api/status
+ * Server returns snake_case JSON, mapped via @SerializedName
  */
 data class StatusResponse(
     val running: Boolean = false,
     val ip: String = "",
     val port: Int = 0,
     val url: String = "",
+    @SerializedName("latest_event")
     val latestEvent: String? = null,
+    @SerializedName("latest_event_time")
     val latestEventTime: Long = 0L,
+    @SerializedName("latest_event_label")
     val latestEventLabel: String = "",
+    @SerializedName("camera_powered")
     val cameraPowered: Boolean = true,
+    @SerializedName("current_camera_id")
     val currentCameraId: String = "",
+    @SerializedName("current_logical_camera_id")
     val currentLogicalCameraId: String = ""
 )
 
@@ -67,6 +78,7 @@ data class StatusResponse(
  */
 data class CameraSwitchResponse(
     val success: Boolean = false,
+    @SerializedName("cameraId")
     val cameraId: String = "",
     val switching: Boolean = false,
     val error: String = ""

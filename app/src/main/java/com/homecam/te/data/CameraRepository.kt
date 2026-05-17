@@ -67,7 +67,7 @@ class CameraRepository {
             onFrame = { jpegData ->
                 frameFlows.getOrPut(device.id) { MutableStateFlow(null) }.value = jpegData
             },
-            onError = { e ->
+            onError = { _ ->
                 updateCameraState(device.id) { it.copy(isOnline = false) }
             }
         )

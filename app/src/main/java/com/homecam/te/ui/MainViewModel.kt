@@ -7,7 +7,6 @@ import com.homecam.te.data.CameraRepository
 import com.homecam.te.model.*
 import com.homecam.te.network.ApiClient
 import com.homecam.te.network.DiscoveryService
-import com.homecam.te.network.DiscoveryService
 import com.homecam.te.service.AlertManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -76,7 +75,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // New events trigger alerts
         viewModelScope.launch {
             cameraStates.collect { states ->
-                states.forEach { (id, state) ->
+                states.forEach { (_, state) ->
                     state.latestEvent?.let { eventType ->
                         alertManager.onEvent(eventType, state.latestEventLabel)
                     }

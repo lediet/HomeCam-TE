@@ -62,7 +62,7 @@ fun EventSheet(
                 )
             } else {
                 LazyColumn {
-                    items(cameraState.events) { event ->
+                    items(cameraState.events.reversed()) { event ->
                         EventItemRow(event)
                     }
                 }
