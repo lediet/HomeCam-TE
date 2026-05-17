@@ -129,64 +129,61 @@ fun HomecamTEApp() {
                                 }
                             }
 
-                            // Bottom controls (power + camera switch)
-                            Box(
+                            // Power toggle (top-right)
+                            IconButton(
+                                onClick = { viewModel.setPower(devId, !(state.isPoweredOn)) },
                                 modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(16.dp)
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(48.dp)
                             ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    // Power toggle
-                                    IconButton(
-                                        onClick = { viewModel.setPower(devId, !(state.isPoweredOn)) },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Surface(
-                                            shape = MaterialTheme.shapes.medium,
-                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.PowerSettingsNew,
-                                                contentDescription = if (state.isPoweredOn) "关闭摄像头" else "打开摄像头",
-                                                tint = if (state.isPoweredOn) Color(0xFF4CAF50) else Color.Gray,
-                                                modifier = Modifier.padding(8.dp)
-                                            )
-                                        }
-                                    }
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PowerSettingsNew,
+                                        contentDescription = if (state.isPoweredOn) "关闭摄像头" else "打开摄像头",
+                                        tint = if (state.isPoweredOn) Color(0xFF4CAF50) else Color.Gray,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
 
-                                    // Camera switch
-                                    if (state.availableCameras.size > 1) {
-                                        var showCamMenu by remember { mutableStateOf(false) }
-                                        IconButton(
-                                            onClick = { showCamMenu = true },
-                                            modifier = Modifier.size(48.dp)
-                                        ) {
-                                            Surface(
-                                                shape = MaterialTheme.shapes.medium,
-                                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.CameraAlt,
-                                                    contentDescription = "切换摄像头",
-                                                    tint = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.padding(8.dp)
-                                                )
+                            // Camera switch (bottom-left)
+                            if (state.availableCameras.size > 1) {
+                                var showCamMenu by remember { mutableStateOf(false) }
+                                IconButton(
+                                    onClick = { showCamMenu = true },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(16.dp)
+                                        .size(48.dp)
+                                ) {
+                                    Surface(
+                                        shape = MaterialTheme.shapes.medium,
+                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.CameraAlt,
+                                            contentDescription = "切换摄像头",
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(8.dp)
+                                        )
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = showCamMenu,
+                                    onDismissRequest = { showCamMenu = false }
+                                ) {
+                                    state.availableCameras.forEach { cam ->
+                                        DropdownMenuItem(
+                                            text = { Text(cam.label.ifEmpty { cam.cameraId }) },
+                                            onClick = {
+                                                showCamMenu = false
+                                                viewModel.switchCamera(devId, cam.cameraId, cam.logicalCameraId.ifEmpty { cam.cameraId })
                                             }
-                                        }
-                                        DropdownMenu(
-                                            expanded = showCamMenu,
-                                            onDismissRequest = { showCamMenu = false }
-                                        ) {
-                                            state.availableCameras.forEach { cam ->
-                                                DropdownMenuItem(
-                                                    text = { Text(cam.label.ifEmpty { cam.cameraId }) },
-                                                    onClick = {
-                                                        showCamMenu = false
-                                                        viewModel.switchCamera(devId, cam.cameraId, cam.logicalCameraId.ifEmpty { cam.cameraId })
-                                                    }
-                                                )
-                                            }
-                                        }
+                                        )
                                     }
                                 }
                             }

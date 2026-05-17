@@ -23,7 +23,7 @@ fun MjpegView(
     AndroidView(
         factory = { ctx ->
             ImageView(ctx).also { iv ->
-                iv.scaleType = ImageView.ScaleType.CENTER_CROP
+                iv.scaleType = ImageView.ScaleType.FIT_CENTER
                 imageView = iv
             }
         },

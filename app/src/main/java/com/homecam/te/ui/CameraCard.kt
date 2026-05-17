@@ -1,7 +1,7 @@
 package com.homecam.te.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,7 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -26,7 +28,6 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CameraCard(
     cameraState: CameraState,
@@ -36,28 +37,37 @@ fun CameraCard(
     onDelete: () -> Unit,
     onPowerToggle: () -> Unit = {},
     onSwitchCamera: (cameraId: String) -> Unit = {},
+    onDragStart: () -> Unit = {},
+    onDrag: (Offset) -> Unit = {},
+    onDragEnd: () -> Unit = {},
+    isEditMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = modifier
-            .padding(4.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .combinedClickable(
-                        onClick = onFullscreen,
-                        onLongClick = { showMenu = true }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
+    Box(modifier = modifier) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(9f / 16f)
+                        .pointerInput(isEditMode) {
+                            if (!isEditMode) {
+                                detectTapGestures(
+                                    onTap = { onFullscreen() },
+                                    onLongPress = { showMenu = true }
+                                )
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
                 if (cameraState.isOnline) {
                     MjpegView(
                         frameFlow = frameFlow,
@@ -93,6 +103,25 @@ fun CameraCard(
                     )
                 }
 
+                // Name overlay (top-left)
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                ) {
+                    Text(
+                        text = cameraState.device.name.ifEmpty { cameraState.device.ip },
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
                 // Power toggle overlay (top-right)
                 IconButton(
                     onClick = onPowerToggle,
@@ -114,14 +143,14 @@ fun CameraCard(
                     }
                 }
 
-                // Camera switch overlay (if multiple cameras)
+                // Camera switch overlay (bottom-left)
                 if (cameraState.availableCameras.size > 1) {
                     var showCameraMenu by remember { mutableStateOf(false) }
                     IconButton(
                         onClick = { showCameraMenu = true },
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(4.dp, 40.dp)
+                            .align(Alignment.BottomStart)
+                            .padding(4.dp)
                             .size(32.dp)
                     ) {
                         Surface(
@@ -163,6 +192,27 @@ fun CameraCard(
             )
         }
     }
+
+    // Edit mode transparent overlay for drag gestures
+    if (isEditMode) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(4.dp)
+                .pointerInput(Unit) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { onDragStart() },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            onDrag(dragAmount)
+                        },
+                        onDragEnd = { onDragEnd() },
+                        onDragCancel = { onDragEnd() }
+                    )
+                }
+        )
+    }
+}
 }
 
 @Composable
@@ -182,23 +232,6 @@ private fun StatusBar(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                modifier = Modifier.size(8.dp),
-                shape = RoundedCornerShape(4.dp),
-                color = if (cameraState.isOnline) Color(0xFF4CAF50) else Color.Gray
-            ) {}
-
-            Spacer(Modifier.width(8.dp))
-
-            Text(
-                text = cameraState.device.name,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-
             if (cameraState.latestEvent != null) {
                 val timeStr = remember(cameraState.latestEventTime) {
                     SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(Date(cameraState.latestEventTime))
