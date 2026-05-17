@@ -175,6 +175,11 @@ class CameraRepository {
         scope.cancel()
     }
 
+    /** Update the device reference in camera state (e.g. after editing name/IP/port) */
+    fun updateDeviceInState(id: String, device: CameraDevice) {
+        updateCameraState(id) { it.copy(device = device) }
+    }
+
     /** Update local state after power/camera switch (no polling needed) */
     fun updateDeviceState(id: String, isPoweredOn: Boolean? = null, currentCameraId: String? = null) {
         updateCameraState(id) {

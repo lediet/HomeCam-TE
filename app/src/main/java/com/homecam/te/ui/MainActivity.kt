@@ -42,10 +42,16 @@ fun HomecamTEApp() {
     val sheetDeviceId by viewModel.sheetDeviceId.collectAsState()
 
     var currentScreen by remember { mutableStateOf("main") }
+    var editingDeviceId by remember { mutableStateOf<String?>(null) }
 
     // Double-back exit
     var backPressTime = 0L
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Handle back press on settings screen — return to main
+    BackHandler(enabled = currentScreen == "settings") {
+        currentScreen = "main"
+    }
 
     // Handle back press for main screen — double-back to exit
     val context = LocalContext.current
@@ -87,6 +93,7 @@ fun HomecamTEApp() {
                         onSetFullscreen = { viewModel.setFullscreen(it) },
                         onShowEvents = { viewModel.showEventSheet(it) },
                         onDeleteCamera = { viewModel.removeDevice(it) },
+                        onEditCamera = { deviceId -> editingDeviceId = deviceId },
                         onPowerToggle = { deviceId -> viewModel.setPower(deviceId, !(cameraStates[deviceId]?.isPoweredOn ?: true)) },
                         onSwitchCamera = { deviceId, cameraId ->
                             val s = cameraStates[deviceId]
@@ -200,6 +207,23 @@ fun HomecamTEApp() {
                         viewModel.addManualDevice(ip, port, name)
                     }
                 )
+            }
+
+            // Edit camera dialog
+            editingDeviceId?.let { deviceId ->
+                val state = cameraStates[deviceId]
+                if (state != null) {
+                    EditCameraDialog(
+                        currentName = state.device.name,
+                        currentIp = state.device.ip,
+                        currentPort = state.device.port,
+                        onDismiss = { editingDeviceId = null },
+                        onConfirm = { ip, port, name ->
+                            viewModel.editDevice(deviceId, ip, port, name)
+                            editingDeviceId = null
+                        }
+                    )
+                }
             }
 
             // Event bottom sheet

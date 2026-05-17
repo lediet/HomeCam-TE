@@ -35,6 +35,7 @@ fun CameraCard(
     onFullscreen: () -> Unit,
     onShowEvents: () -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit = {},
     onPowerToggle: () -> Unit = {},
     onSwitchCamera: (cameraId: String) -> Unit = {},
     onDragStart: () -> Unit = {},
@@ -68,11 +69,22 @@ fun CameraCard(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                if (cameraState.isOnline) {
+                if (cameraState.isOnline && cameraState.isPoweredOn) {
                     MjpegView(
                         frameFlow = frameFlow,
                         modifier = Modifier.fillMaxSize()
                     )
+                } else if (cameraState.isOnline) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.PowerSettingsNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.Gray
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(text = "设备关闭", color = Color.Gray, fontSize = 14.sp)
+                    }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
@@ -91,6 +103,13 @@ fun CameraCard(
                     onDismissRequest = { showMenu = false },
                     offset = DpOffset(8.dp, 0.dp)
                 ) {
+                    DropdownMenuItem(
+                        text = { Text("编辑设备") },
+                        onClick = {
+                            showMenu = false
+                            onEdit()
+                        }
+                    )
                     DropdownMenuItem(
                         text = { Text("删除设备", color = Color.Red) },
                         leadingIcon = {

@@ -1,6 +1,7 @@
 package com.homecam.te.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.homecam.te.data.CameraRepository
@@ -44,8 +45,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sheetDeviceId: StateFlow<String?> = _sheetDeviceId.asStateFlow()
 
     /** Alert settings (mirrored in AlertManager) */
-    private val _alertSettings = MutableStateFlow(AlertSettings())
+    private val prefs = application.getSharedPreferences("homecam_te_prefs", Context.MODE_PRIVATE)
+    private val _alertSettings = MutableStateFlow(loadAlertSettings())
     val alertSettings: StateFlow<AlertSettings> = _alertSettings.asStateFlow()
+
+    private fun loadAlertSettings(): AlertSettings {
+        return AlertSettings(
+            enabled = prefs.getBoolean("alert_enabled", true),
+            vibrate = prefs.getBoolean("alert_vibrate", true),
+            voice = prefs.getBoolean("alert_voice", true),
+            enterAlert = prefs.getBoolean("alert_enter", true),
+            leaveAlert = prefs.getBoolean("alert_leave", true),
+            cryAlert = prefs.getBoolean("alert_cry", true),
+            sleepAlert = prefs.getBoolean("alert_sleep", true)
+        )
+    }
 
     /** Snackbar message */
     private val _snackbarMessage = MutableStateFlow<String?>(null)
@@ -73,12 +87,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // New events trigger alerts
+        // New events trigger alerts (dedup: skip events already alerted before restart)
         viewModelScope.launch {
             cameraStates.collect { states ->
-                states.forEach { (_, state) ->
+                states.forEach { (deviceId, state) ->
                     state.latestEvent?.let { eventType ->
-                        alertManager.onEvent(eventType, state.latestEventLabel)
+                        val lastTime = prefs.getLong("alert_last_time_$deviceId", 0L)
+                        if (state.latestEventTime > lastTime) {
+                            alertManager.onEvent(eventType, state.latestEventLabel)
+                            prefs.edit().putLong("alert_last_time_$deviceId", state.latestEventTime).apply()
+                        }
                     }
                 }
             }
@@ -139,6 +157,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun editDevice(oldId: String, ip: String, port: String, name: String) {
+        viewModelScope.launch {
+            val portInt = port.toIntOrNull() ?: 8080
+            val newId = "manual_${ip.trim()}_$portInt"
+            val oldState = cameraStates.value[oldId]
+
+            val device = CameraDevice(
+                id = newId,
+                name = name.ifEmpty { ip.trim() },
+                ip = ip.trim(),
+                port = portInt,
+                isAutoDiscovered = oldState?.device?.isAutoDiscovered ?: false,
+                lastSeen = System.currentTimeMillis()
+            )
+
+            if (oldId != newId) {
+                // IP/port changed → remove old connection, add new
+                repository.removeDevice(oldId)
+                repository.saveDevice(device)
+                repository.connectDevice(device)
+            } else {
+                // Same ID, just update name
+                repository.saveDevice(device)
+                repository.updateDeviceInState(oldId, device)
+            }
+        }
+    }
+
     // ----- Fullscreen -----
 
     fun setFullscreen(deviceId: String?) {
@@ -191,6 +237,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         alertManager.leaveAlertEnabled = settings.leaveAlert
         alertManager.cryAlertEnabled = settings.cryAlert
         alertManager.sleepAlertEnabled = settings.sleepAlert
+        // Persist to SharedPreferences
+        prefs.edit()
+            .putBoolean("alert_enabled", settings.enabled)
+            .putBoolean("alert_vibrate", settings.vibrate)
+            .putBoolean("alert_voice", settings.voice)
+            .putBoolean("alert_enter", settings.enterAlert)
+            .putBoolean("alert_leave", settings.leaveAlert)
+            .putBoolean("alert_cry", settings.cryAlert)
+            .putBoolean("alert_sleep", settings.sleepAlert)
+            .apply()
     }
 
     // ----- Snackbar -----
