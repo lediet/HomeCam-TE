@@ -28,6 +28,8 @@ fun TEGridScreen(
     onSetFullscreen: (String?) -> Unit,
     onShowEvents: (String) -> Unit,
     onDeleteCamera: (String) -> Unit,
+    onPowerToggle: (String) -> Unit = {},
+    onSwitchCamera: (deviceId: String, cameraId: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val deviceCount = cameraStates.size
@@ -93,6 +95,8 @@ fun TEGridScreen(
                 onSetFullscreen = onSetFullscreen,
                 onShowEvents = onShowEvents,
                 onDeleteCamera = onDeleteCamera,
+                onPowerToggle = onPowerToggle,
+                onSwitchCamera = onSwitchCamera,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -106,6 +110,8 @@ private fun CameraGrid(
     onSetFullscreen: (String?) -> Unit,
     onShowEvents: (String) -> Unit,
     onDeleteCamera: (String) -> Unit,
+    onPowerToggle: (String) -> Unit = {},
+    onSwitchCamera: (deviceId: String, cameraId: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val count = cameraStates.size
@@ -123,6 +129,8 @@ private fun CameraGrid(
                         onFullscreen = { onSetFullscreen(state.device.id) },
                         onShowEvents = { onShowEvents(state.device.id) },
                         onDelete = { onDeleteCamera(state.device.id) },
+                        onPowerToggle = { onPowerToggle(state.device.id) },
+                        onSwitchCamera = { cameraId -> onSwitchCamera(state.device.id, cameraId) },
                         modifier = Modifier.weight(1f)
                     )
                     index++
@@ -135,6 +143,8 @@ private fun CameraGrid(
                             onFullscreen = { onSetFullscreen(state.device.id) },
                             onShowEvents = { onShowEvents(state.device.id) },
                             onDelete = { onDeleteCamera(state.device.id) },
+                            onPowerToggle = { onPowerToggle(state.device.id) },
+                            onSwitchCamera = { cameraId -> onSwitchCamera(state.device.id, cameraId) },
                             modifier = Modifier.weight(1f)
                         )
                         index++
@@ -147,6 +157,8 @@ private fun CameraGrid(
                             onFullscreen = { onSetFullscreen(state1.device.id) },
                             onShowEvents = { onShowEvents(state1.device.id) },
                             onDelete = { onDeleteCamera(state1.device.id) },
+                            onPowerToggle = { onPowerToggle(state1.device.id) },
+                            onSwitchCamera = { cameraId -> onSwitchCamera(state1.device.id, cameraId) },
                             modifier = Modifier.weight(1f)
                         )
                         CameraCard(
@@ -155,6 +167,8 @@ private fun CameraGrid(
                             onFullscreen = { onSetFullscreen(state2.device.id) },
                             onShowEvents = { onShowEvents(state2.device.id) },
                             onDelete = { onDeleteCamera(state2.device.id) },
+                            onPowerToggle = { onPowerToggle(state2.device.id) },
+                            onSwitchCamera = { cameraId -> onSwitchCamera(state2.device.id, cameraId) },
                             modifier = Modifier.weight(1f)
                         )
                         index += 2
@@ -166,6 +180,8 @@ private fun CameraGrid(
                             onFullscreen = { onSetFullscreen(state.device.id) },
                             onShowEvents = { onShowEvents(state.device.id) },
                             onDelete = { onDeleteCamera(state.device.id) },
+                            onPowerToggle = { onPowerToggle(state.device.id) },
+                            onSwitchCamera = { cameraId -> onSwitchCamera(state.device.id, cameraId) },
                             modifier = Modifier.weight(1f)
                         )
                         index++

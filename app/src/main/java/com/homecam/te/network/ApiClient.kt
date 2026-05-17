@@ -66,10 +66,9 @@ class ApiClient(private val baseUrl: String) {
             val request = Request.Builder().url(url("/api/cameras")).get().build()
             val response = client.newCall(request).execute()
             if (response.isSuccessful) {
-                val body = response.body?.string() ?: "[]"
-                val type = object : TypeToken<List<CameraInfo>>() {}.type
-                val cameras: List<CameraInfo> = gson.fromJson(body, type)
-                Result.success(cameras)
+                val body = response.body?.string() ?: "{\"cameras\":[]}"
+                val res = gson.fromJson(body, CamerasResponse::class.java)
+                Result.success(res.cameras)
             } else {
                 Result.failure(Exception("HTTP ${response.code}"))
             }

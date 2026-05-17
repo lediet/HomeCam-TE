@@ -8,6 +8,7 @@ import com.homecam.te.model.*
 import com.homecam.te.network.ApiClient
 import com.homecam.te.network.DiscoveryService
 import com.homecam.te.service.AlertManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -159,14 +160,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setPower(deviceId: String, on: Boolean) {
         viewModelScope.launch {
             val client = repository.getApiClient(deviceId)
-            client?.setPower(on)
+            client?.setPower(on)?.onSuccess {
+                repository.updateDeviceState(deviceId, isPoweredOn = on)
+            }
+            if (on) {
+                // Restart MJPEG stream so video resumes after power-on
+                delay(300)
+                repository.restartMjpeg(deviceId)
+            }
         }
     }
 
     fun switchCamera(deviceId: String, cameraId: String, logicalCameraId: String) {
         viewModelScope.launch {
             val client = repository.getApiClient(deviceId)
-            client?.switchCamera(cameraId, logicalCameraId)
+            client?.switchCamera(cameraId, logicalCameraId)?.onSuccess {
+                repository.updateDeviceState(deviceId, currentCameraId = cameraId)
+            }
         }
     }
 

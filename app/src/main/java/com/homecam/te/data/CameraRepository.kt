@@ -1,5 +1,6 @@
 package com.homecam.te.data
 
+import android.util.Log
 import com.homecam.te.HomeCamApp
 import com.homecam.te.model.*
 import com.homecam.te.network.ApiClient
@@ -66,6 +67,11 @@ class CameraRepository {
             url = "$baseUrl/video",
             onFrame = { jpegData ->
                 frameFlows.getOrPut(device.id) { MutableStateFlow(null) }.value = jpegData
+                // Mark online when frames arrive (e.g. after reconnection)
+                val cur = cameraStates.value[device.id]
+                if (cur != null && !cur.isOnline) {
+                    updateCameraState(device.id) { it.copy(isOnline = true) }
+                }
             },
             onError = { _ ->
                 updateCameraState(device.id) { it.copy(isOnline = false) }
@@ -91,28 +97,12 @@ class CameraRepository {
             onError = { /* silently ignore poll errors */ }
         )
 
-        // Status poller (every 5s)
-        val statusJob = scope.launch {
-            while (isActive) {
-                delay(5000)
-                val result = apiClient.getStatus()
-                result.onSuccess { status ->
-                    updateCameraState(device.id) {
-                        it.copy(
-                            isOnline = true,
-                            isPoweredOn = status.cameraPowered,
-                            currentCameraId = status.currentCameraId
-                        )
-                    }
-                }
-                result.onFailure {
-                    updateCameraState(device.id) { it.copy(isOnline = false) }
-                }
-
-                val camResult = apiClient.getCameras()
-                camResult.onSuccess { cameras ->
-                    updateCameraState(device.id) { it.copy(availableCameras = cameras) }
-                }
+        // Fetch cameras list once on connect
+        scope.launch {
+            delay(1000)
+            val camResult = apiClient.getCameras()
+            camResult.onSuccess { cameras ->
+                updateCameraState(device.id) { it.copy(availableCameras = cameras) }
             }
         }
 
@@ -120,8 +110,7 @@ class CameraRepository {
             device = device,
             apiClient = apiClient,
             mjpegClient = mjpegClient,
-            eventPoller = eventPoller,
-            statusJob = statusJob
+            eventPoller = eventPoller
         )
 
         // Start MJPEG streaming
@@ -144,7 +133,6 @@ class CameraRepository {
         connections.remove(id)?.let { conn ->
             conn.mjpegClient.stop()
             conn.eventPoller.stop()
-            conn.statusJob.cancel()
         }
         cameraStates.update { map -> map - id }
     }
@@ -155,6 +143,18 @@ class CameraRepository {
 
     /** Get ApiClient for a device (for controls: power, switch) */
     fun getApiClient(deviceId: String): ApiClient? = connections[deviceId]?.apiClient
+
+    /** Restart MJPEG stream for a device (e.g. after power toggle) */
+    fun restartMjpeg(deviceId: String) {
+        connections[deviceId]?.let { conn ->
+            conn.mjpegClient.stop()
+            scope.launch {
+                delay(500) // wait for server to settle
+                Log.d("CameraRepository", "Restarting MJPEG for $deviceId")
+                conn.mjpegClient.start()
+            }
+        }
+    }
 
     /** Per-device frame flow for MJPEG rendering */
     private val frameFlows = mutableMapOf<String, MutableStateFlow<ByteArray?>>()
@@ -175,11 +175,20 @@ class CameraRepository {
         scope.cancel()
     }
 
+    /** Update local state after power/camera switch (no polling needed) */
+    fun updateDeviceState(id: String, isPoweredOn: Boolean? = null, currentCameraId: String? = null) {
+        updateCameraState(id) {
+            it.copy(
+                isPoweredOn = isPoweredOn ?: it.isPoweredOn,
+                currentCameraId = currentCameraId ?: it.currentCameraId
+            )
+        }
+    }
+
     private data class CameraConnection(
         val device: CameraDevice,
         val apiClient: ApiClient,
         val mjpegClient: MjpegClient,
-        val eventPoller: EventPoller,
-        val statusJob: Job
+        val eventPoller: EventPoller
     )
 }

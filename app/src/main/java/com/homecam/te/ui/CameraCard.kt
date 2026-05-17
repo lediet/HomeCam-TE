@@ -22,6 +22,9 @@ import com.homecam.te.model.CameraState
 import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
 import java.util.Date
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -31,6 +34,8 @@ fun CameraCard(
     onFullscreen: () -> Unit,
     onShowEvents: () -> Unit,
     onDelete: () -> Unit,
+    onPowerToggle: () -> Unit = {},
+    onSwitchCamera: (cameraId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -86,6 +91,68 @@ fun CameraCard(
                             onDelete()
                         }
                     )
+                }
+
+                // Power toggle overlay (top-right)
+                IconButton(
+                    onClick = onPowerToggle,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(32.dp)
+                ) {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                    ) {
+                        Icon(
+                            Icons.Default.PowerSettingsNew,
+                            contentDescription = if (cameraState.isPoweredOn) "关闭摄像头" else "打开摄像头",
+                            tint = if (cameraState.isPoweredOn) Color(0xFF4CAF50) else Color.Gray,
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                }
+
+                // Camera switch overlay (if multiple cameras)
+                if (cameraState.availableCameras.size > 1) {
+                    var showCameraMenu by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { showCameraMenu = true },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(4.dp, 40.dp)
+                            .size(32.dp)
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                        ) {
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = "切换摄像头",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(4.dp)
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = showCameraMenu,
+                        onDismissRequest = { showCameraMenu = false }
+                    ) {
+                        cameraState.availableCameras.forEach { cam ->
+                            DropdownMenuItem(
+                                text = { Text(cam.label.ifEmpty { cam.cameraId }) },
+                                onClick = {
+                                    showCameraMenu = false
+                                    onSwitchCamera(cam.cameraId)
+                                },
+                                trailingIcon = if (cam.cameraId == cameraState.currentCameraId) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                } else null
+                            )
+                        }
+                    }
                 }
             }
 

@@ -8,9 +8,12 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -84,6 +87,12 @@ fun HomecamTEApp() {
                         onSetFullscreen = { viewModel.setFullscreen(it) },
                         onShowEvents = { viewModel.showEventSheet(it) },
                         onDeleteCamera = { viewModel.removeDevice(it) },
+                        onPowerToggle = { deviceId -> viewModel.setPower(deviceId, !(cameraStates[deviceId]?.isPoweredOn ?: true)) },
+                        onSwitchCamera = { deviceId, cameraId ->
+                            val s = cameraStates[deviceId]
+                            val logicalId = s?.availableCameras?.find { it.cameraId == cameraId }?.logicalCameraId ?: cameraId
+                            viewModel.switchCamera(deviceId, cameraId, logicalId)
+                        },
                         modifier = Modifier.padding(scaffoldPadding)
                     )
                 }
@@ -117,6 +126,68 @@ fun HomecamTEApp() {
                                         contentDescription = "关闭全屏",
                                         modifier = Modifier.padding(4.dp)
                                     )
+                                }
+                            }
+
+                            // Bottom controls (power + camera switch)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(16.dp)
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    // Power toggle
+                                    IconButton(
+                                        onClick = { viewModel.setPower(devId, !(state.isPoweredOn)) },
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Surface(
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.PowerSettingsNew,
+                                                contentDescription = if (state.isPoweredOn) "关闭摄像头" else "打开摄像头",
+                                                tint = if (state.isPoweredOn) Color(0xFF4CAF50) else Color.Gray,
+                                                modifier = Modifier.padding(8.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Camera switch
+                                    if (state.availableCameras.size > 1) {
+                                        var showCamMenu by remember { mutableStateOf(false) }
+                                        IconButton(
+                                            onClick = { showCamMenu = true },
+                                            modifier = Modifier.size(48.dp)
+                                        ) {
+                                            Surface(
+                                                shape = MaterialTheme.shapes.medium,
+                                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.CameraAlt,
+                                                    contentDescription = "切换摄像头",
+                                                    tint = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.padding(8.dp)
+                                                )
+                                            }
+                                        }
+                                        DropdownMenu(
+                                            expanded = showCamMenu,
+                                            onDismissRequest = { showCamMenu = false }
+                                        ) {
+                                            state.availableCameras.forEach { cam ->
+                                                DropdownMenuItem(
+                                                    text = { Text(cam.label.ifEmpty { cam.cameraId }) },
+                                                    onClick = {
+                                                        showCamMenu = false
+                                                        viewModel.switchCamera(devId, cam.cameraId, cam.logicalCameraId.ifEmpty { cam.cameraId })
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

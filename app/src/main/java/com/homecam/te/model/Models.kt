@@ -47,7 +47,21 @@ data class CameraInfo(
     val cameraId: String,
     @SerializedName("logicalCameraId")
     val logicalCameraId: String = "",
+    @SerializedName("label")
     val label: String = ""
+)
+
+/**
+ * Cameras list response from GET /api/cameras
+ * Returns {"cameras": [...], "currentCameraId": "...", ...}
+ */
+data class CamerasResponse(
+    @SerializedName("cameras")
+    val cameras: List<CameraInfo> = emptyList(),
+    @SerializedName("currentCameraId")
+    val currentCameraId: String = "",
+    @SerializedName("currentLogicalCameraId")
+    val currentLogicalCameraId: String = ""
 )
 
 /**
