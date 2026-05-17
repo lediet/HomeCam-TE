@@ -1,8 +1,8 @@
 # Homecam-TE v1.0.0 工作记录与技术文档
 
 **最后更新**：2026-05-17
-**版本**：1.0.0
-**状态**：首个可用版本，支持多设备 MJPEG 显示、事件轮询、语音+振动报警、UDP 自动发现
+**版本**：1.1.0
+**状态**：v1.1.0 — 移除状态轮询、优化 MJPEG 帧驱动在线状态、9:16 竖屏视频比例、自适应网格优化、拖拽排序（代码已实现但因手势冲突暂未启用）
 
 ---
 
@@ -28,7 +28,7 @@
 
 ### 1.1 定位
 
-Homecam-TE 是 HomeCam 监控系统的 Android 显示终端（Terminal）。用于在局域网内接收多台 HomeCam 设备的 MJPEG 视频流、控制摄像头开关/镜头切换、显示事件日志并支持语音+振动报警。最多支持 4 台设备同时显示。
+Homecam-TE 是 HomeCam 监控系统的 Android 显示终端（Terminal）。用于在局域网内接收多台 HomeCam 设备的 MJPEG 视频流、控制摄像头开关/镜头切换、显示事件日志并支持语音+振动报警。支持自适应网格布局，多设备页面可滚动。
 
 ### 1.2 技术栈
 
@@ -484,30 +484,45 @@ data class EventItem(
 | 设备数 | 列数 | 布局 |
 |--------|------|------|
 | 1 台 | 1 列 | 单卡片占满宽度 |
-| 2 台 | 1 列 | 上下各一张（竖屏为主） |
-| 3 台 | 2 列 | 前 2 张并排，第 3 张跨列 |
-| 4 台 | 2 列 | 2x2 网格 |
+| 2~N 台 | 2 列 | 始终双列布局，奇数台时最后一张在左下角（右下角空位） |
+
+布局算法：
+- `columns = if (count == 1) 1 else 2`
+- 奇数台时最后一行仅左列有卡片，右列空位 `Spacer(weight(1f))` 填充
 
 ### 9.2 卡片结构
 
 ```
 +------------------------------------------+
-|                                          |
+|[名称/IP]                      [电源]       |
 |   MJPEG 视频画面 / 离线占位图              |
-|   (16:9 比例)                             |
-|                                          |
+|   (9:16 竖屏比例, FIT_CENTER)             |
+|                               [镜头切换]   |
 +------------------------------------------+
-|  ● 设备名  最新事件文本   [展开箭头 >]    |
+|  最新事件文本                [展开箭头 >]  |
 +------------------------------------------+
 ```
+
+- 画面比例 9:16（竖屏），`FIT_CENTER` 缩放（不足留黑边，不裁剪）
+- 左上角悬浮显示设备名称（无名称显示 IP）
+- 右上角电源开关按钮
+- 左下角镜头切换按钮（仅多镜头设备可见）
+- 底部状态栏只显示事件文本 + 展开箭头（不显示设备名称）
+- 主页面支持纵向滚动（多设备时）
 
 ### 9.3 交互
 
 | 操作 | 行为 |
 |------|------|
 | 点击画面 | 全屏预览 |
-| 长按画面 | 弹出控制菜单（预留） |
+| 长按画面 | 弹出删除菜单（无拖拽时） |
 | 点击展开箭头 | 底部弹窗显示最近 20 条事件 |
+| 点击电源 | 切换摄像头电源 |
+| 点击镜头切换 | 切换摄像头镜头（多镜头设备） |
+
+### 9.4 拖拽排序（待启用）
+
+编辑模式拖拽排序功能已实现代码但暂未启用，详见 [11.2 编辑模式拖拽排序（待完善）](#112-编辑模式拖拽排序待完善)。
 
 ### 9.4 全屏模式
 
@@ -583,15 +598,49 @@ adb install app-debug.apk
 | `MjpegClient` | `job` 变量 unused — `start()` 在 `withContext` 中运行，`job?.cancel()` 无法打断 `connectAndRead()` 的阻塞 read | 使用 `interrupt()` 或关闭 socket |
 | 未连接时 UI | 设备离线状态显示已实现，但无重连按钮 | 添加手动重连 UI |
 
-### 11.2 功能缺失 (P2)
+### 11.2 编辑模式拖拽排序（待完善）
 
-| 功能 | 说明 |
-|------|------|
-| 长按控制菜单 | CameraCard 已预留 `onLongPress` 回调，但未实现菜单 UI |
-| 设备删除 | 已实现 repository 方法，但 UI 层未添加删除入口 |
-| 设备离线自动重连 | 目前仅在 MJPEG 流断开时标记离线，没有主动重连机制 |
-| 设置持久化 | AlertSettings 当前在内存中，未持久化到 SharedPreferences |
-| 通知栏前台服务 | 目前未使用前台服务保活 |
+#### 功能说明
+
+编辑模式下用户可通过长按 + 拖拽调整视频卡片在网格中的排列顺序。该功能代码已实现但因手势检测与 MJPEG 原生 View 的触摸事件冲突而暂未启用，编辑按钮已从 UI 隐藏。
+
+#### 已实现的代码
+
+**TEGridScreen.kt** — `CameraGrid` 函数中包含：
+
+- **`order`** (`remember(cameraStates) { mutableStateOf(cameraStates.indices.toList()) }`) — 卡片显示顺序，随 `cameraStates` 变化自动重建
+- **`draggedIndex`** / **`dragAccumulated`** — 拖拽过程中的状态追踪
+- **`orderedStates`** (`order.filter { ... }.map { ... }`) — 按 order 排序后的卡片列表，含越界过滤
+- **`moveItem(from, to)`** — 列表重排操作（`add(to, removeAt(from))`）
+- **`isEditMode`** 参数 — 贯穿 TEGridScreen → CameraGrid → CameraCard
+
+**CameraCard.kt** — 手势处理：
+
+- **普通模式**：`detectTapGestures` — 点按全屏、长按弹出删除菜单
+- **编辑模式**：`detectDragGesturesAfterLongPress` — 长按 + 拖拽触发重排
+- **透明覆盖层**：编辑模式下，在 Card 上方叠加 `matchParentSize()` 的透明 Box，手势由覆盖层捕获，绕开内部 AndroidView 的事件消费
+- 当前实现采用**单个 `pointerInput(isEditMode)` 块**，通过 `isEditMode` key 自动切换手势策略
+
+#### 冲突根因
+
+`MjpegView` 使用 `AndroidView` 包装原生 `ImageView`（`ImageView`）。Compose 中 Native View 在 `PointerEventPass.Main` 阶段优先消费触摸事件，导致即使手势处理器放在 Card 层级也收不到连续的拖动事件。
+
+尝试过的方案：
+1. ❌ `return@label` 语法 — Kotlin 不支持对此处嵌套 lambda 的标签引用
+2. ❌ 将 `pointerInput` 从 Box 移到 Card 修饰器层级 — AndroidView 仍在事件链底层拦截
+3. ❌ 透明覆盖层（当前方案）— `matchParentSize()` 覆盖层在 Z 轴最顶层仍无法捕获拖动事件
+
+#### 未来修复方向
+
+1. **替换手势 API**：尝试使用 `Modifier.draggable()` 或 `Modifier.scrollable()` 替代 `detectDragGesturesAfterLongPress`
+2. **修改 MjpegView**：禁止 ImageView 消费触摸事件（`isClickable = false`、重写 `onTouchEvent` 返回 `false`）
+3. **原生手势代理**：在 `AndroidView` 的 `update` 块中代理触摸事件到 Compose
+4. **使用 Compose 的 `PointerEventPass.Initial`**：在自定义 `awaitEachGesture` 中指定 Initial pass，在事件到达 Native View 之前拦截
+5. **改用按钮排序**：放弃拖拽，改为上移/下移按钮的交互方式
+
+#### 启用方式
+
+恢复编辑按钮后只需将 `isEditMode = false` 改为绑定状态变量即可启用。相关代码全部保留。
 
 ### 11.3 性能优化 (P2)
 
@@ -631,6 +680,33 @@ adb install app-debug.apk
 ---
 
 ## 13. 版本记录
+
+### v1.1.0 (2026-05-17)
+
+#### 新增与优化
+
+1. **移除状态轮询** — 删除 5 秒定时轮询 `/api/status`，改为 MJPEG 帧驱动在线状态 + API 调用结果即时更新
+2. **摄像头切换功能** — 全屏和卡片左下角新增镜头切换按钮，调用 `/api/camera/switch`
+3. **电源开关刷新** — 关闭再打开电源后自动重启 MJPEG 流，视频恢复正常
+4. **9:16 竖屏视频比例** — 卡片画面从 16:9 改为 9:16，`FIT_CENTER` 缩放（留黑边不裁剪）
+5. **自适应网格优化** — 1 台单列，2 台及以上双列；奇数台时最后一张在左下角，右下角空位
+6. **主页面滚动** — 添加 `verticalScroll + rememberScrollState`，多设备时可滚动
+7. **卡片布局重构** — 左上角名称悬浮层（名称/IP）、右上角电源、左下角镜头切换
+8. **状态栏简化** — 只显示事件文本 + 展开箭头，名称已移至视频画面覆盖层
+9. **拖拽排序（代码已实现，暂未启用）** — 详见 [11.2 编辑模式拖拽排序（待完善）](#112-编辑模式拖拽排序待完善)
+10. **Gson 解析修复** — `/api/cameras` 返回 `{"cameras":[...]}` 对象格式，修复原 `TypeToken<List>` 解析失败
+
+#### BUG 修复
+
+- 添加/删除摄像头闪退：`remember(order, cameraStates)` 中 `order` 索引越界，改为 `remember(cameraStates)` 自动同步
+- `return@let` 编译错误：Kotlin 不支持参数名 lambda 标签引用，改为条件反转 `if (draggedIndex >= 0) { ... }` 避免 `return`
+- 卡片左上角显示优化：只显示名称（无名称显示 IP），去掉 IP:端口 第二行
+
+#### 版本号
+
+- `versionName = "1.1.0"`
+
+---
 
 ### v1.0.0 (2026-05-17)
 
