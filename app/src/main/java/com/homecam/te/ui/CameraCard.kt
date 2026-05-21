@@ -290,6 +290,9 @@ private fun formatEventShort(type: String, label: String): String {
         "cry" -> "婴儿哭声"
         "sleep" -> "宝宝睡着了"
         "wake_up" -> "宝宝睡醒了"
+        "fall" -> "检测到有人摔倒"
+        "get_up" -> "有人站起来了"
+        "phone" -> if (label.isNotEmpty()) "有人在玩手机（${label}）" else "有人在玩手机"
         else -> type
     }
 }

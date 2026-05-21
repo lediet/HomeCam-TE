@@ -29,12 +29,16 @@ class AlertManager(private val context: Context) {
     var leaveAlertEnabled = true
     var cryAlertEnabled = true
     var sleepAlertEnabled = true
+    var fallAlertEnabled = true
+    var getUpAlertEnabled = true
+    var phoneAlertEnabled = true
 
     /**
      * Trigger alert for an event.
      */
     fun onEvent(type: String, label: String = "") {
         if (!alertEnabled) return
+        if (!isEventEnabled(type)) return
 
         if (voiceEnabled) {
             playNotificationSound()
@@ -42,6 +46,20 @@ class AlertManager(private val context: Context) {
 
         if (vibrateEnabled) {
             vibrate(type)
+        }
+    }
+
+    private fun isEventEnabled(type: String): Boolean {
+        return when (type) {
+            "enter" -> enterAlertEnabled
+            "leave" -> leaveAlertEnabled
+            "cry" -> cryAlertEnabled
+            "sleep" -> sleepAlertEnabled
+            "wake_up" -> sleepAlertEnabled
+            "fall" -> fallAlertEnabled
+            "get_up" -> getUpAlertEnabled
+            "phone" -> phoneAlertEnabled
+            else -> true
         }
     }
 

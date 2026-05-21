@@ -121,13 +121,18 @@ private fun EventItemRow(event: EventItem) {
 }
 
 private fun eventText(event: EventItem): String {
-    return when (event.type) {
-        "enter" -> "有${event.label}进入了"
-        "leave" -> "有${event.label}离开了"
-        "cry" -> "检测到婴儿哭声"
-        "sleep" -> "宝宝睡着了"
-        "wake_up" -> "宝宝睡醒了"
-        else -> event.displayText.ifEmpty { event.type }
+    return event.displayText.ifEmpty {
+        when (event.type) {
+            "enter" -> "有${event.label}进入了"
+            "leave" -> "有${event.label}离开了"
+            "cry" -> "检测到婴儿哭声"
+            "sleep" -> "宝宝睡着了"
+            "wake_up" -> "宝宝睡醒了"
+            "fall" -> "检测到有人摔倒"
+            "get_up" -> "有人站起来了"
+            "phone" -> if (event.label.isNotEmpty()) "有人在玩手机（${event.label}）" else "有人在玩手机"
+            else -> event.type
+        }
     }
 }
 
@@ -138,6 +143,9 @@ private fun eventTypeLabel(type: String): String {
         "cry" -> "哭声"
         "sleep" -> "睡眠"
         "wake_up" -> "醒来"
+        "fall" -> "跌倒"
+        "get_up" -> "起身"
+        "phone" -> "玩手机"
         else -> type
     }
 }

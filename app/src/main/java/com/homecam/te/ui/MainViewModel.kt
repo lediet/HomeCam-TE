@@ -57,7 +57,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             enterAlert = prefs.getBoolean("alert_enter", true),
             leaveAlert = prefs.getBoolean("alert_leave", true),
             cryAlert = prefs.getBoolean("alert_cry", true),
-            sleepAlert = prefs.getBoolean("alert_sleep", true)
+            sleepAlert = prefs.getBoolean("alert_sleep", true),
+            fallAlert = prefs.getBoolean("alert_fall", true),
+            getUpAlert = prefs.getBoolean("alert_get_up", true),
+            phoneAlert = prefs.getBoolean("alert_phone", true)
         )
     }
 
@@ -245,6 +248,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         alertManager.leaveAlertEnabled = settings.leaveAlert
         alertManager.cryAlertEnabled = settings.cryAlert
         alertManager.sleepAlertEnabled = settings.sleepAlert
+        alertManager.fallAlertEnabled = settings.fallAlert
+        alertManager.getUpAlertEnabled = settings.getUpAlert
+        alertManager.phoneAlertEnabled = settings.phoneAlert
         // Persist to SharedPreferences
         prefs.edit()
             .putBoolean("alert_enabled", settings.enabled)
@@ -254,6 +260,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .putBoolean("alert_leave", settings.leaveAlert)
             .putBoolean("alert_cry", settings.cryAlert)
             .putBoolean("alert_sleep", settings.sleepAlert)
+            .putBoolean("alert_fall", settings.fallAlert)
+            .putBoolean("alert_get_up", settings.getUpAlert)
+            .putBoolean("alert_phone", settings.phoneAlert)
             .apply()
     }
 
@@ -277,5 +286,8 @@ data class AlertSettings(
     val enterAlert: Boolean = true,
     val leaveAlert: Boolean = true,
     val cryAlert: Boolean = true,
-    val sleepAlert: Boolean = true
+    val sleepAlert: Boolean = true,
+    val fallAlert: Boolean = true,
+    val getUpAlert: Boolean = true,
+    val phoneAlert: Boolean = true
 )

@@ -1,4 +1,4 @@
-# Homecam-TE v1.2.0
+# Homecam-TE v1.2.1
 
 HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeCam 设备的 MJPEG 视频流，支持事件监控、语音+振动报警和摄像头控制。
 

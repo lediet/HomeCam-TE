@@ -79,6 +79,24 @@ fun SettingsScreen(
                     onCheckedChange = { onUpdateSettings(settings.copy(sleepAlert = it)) },
                     enabled = settings.enabled
                 )
+                SwitchRow(
+                    label = "跌倒报警",
+                    checked = settings.fallAlert,
+                    onCheckedChange = { onUpdateSettings(settings.copy(fallAlert = it)) },
+                    enabled = settings.enabled
+                )
+                SwitchRow(
+                    label = "起身报警",
+                    checked = settings.getUpAlert,
+                    onCheckedChange = { onUpdateSettings(settings.copy(getUpAlert = it)) },
+                    enabled = settings.enabled
+                )
+                SwitchRow(
+                    label = "玩手机报警",
+                    checked = settings.phoneAlert,
+                    onCheckedChange = { onUpdateSettings(settings.copy(phoneAlert = it)) },
+                    enabled = settings.enabled
+                )
             }
 
             HorizontalDivider()

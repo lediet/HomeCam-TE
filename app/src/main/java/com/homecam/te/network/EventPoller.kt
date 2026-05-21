@@ -32,11 +32,12 @@ class EventPoller(
                         val newItems = events
                             .filter { it.timestamp > lastEventTime }
                             .map { ev ->
+                                val (cleanType, extra) = parseEventType(ev.eventType)
                                 EventItem(
-                                    type = ev.eventType,
+                                    type = cleanType,
                                     time = ev.timestamp,
                                     label = ev.label,
-                                    displayText = formatEventText(ev.eventType, ev.label)
+                                    displayText = formatEventText(cleanType, ev.label, extra)
                                 )
                             }
                         if (newItems.isNotEmpty()) {
@@ -61,13 +62,21 @@ class EventPoller(
     companion object {
         private const val POLL_INTERVAL_MS = 5000L
 
-        fun formatEventText(type: String, label: String = ""): String {
+        private fun parseEventType(rawType: String): Pair<String, String> {
+            val parts = rawType.split(":", limit = 2)
+            return parts.first() to parts.getOrElse(1) { "" }
+        }
+
+        fun formatEventText(type: String, label: String = "", extra: String = ""): String {
             return when (type) {
                 "enter" -> "有${label}进入了"
                 "leave" -> "有${label}离开了"
-                "cry" -> "检测到婴儿哭声"
+                "cry" -> "婴儿哭声"
                 "sleep" -> "宝宝睡着了"
                 "wake_up" -> "宝宝睡醒了"
+                "fall" -> "检测到有人摔倒"
+                "get_up" -> "有人站起来了"
+                "phone" -> if (label.isNotEmpty()) "有人在玩手机（${label}）" else "有人在玩手机"
                 else -> type
             }
         }
