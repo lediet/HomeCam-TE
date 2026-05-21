@@ -1,8 +1,8 @@
 # Homecam-TE v1.0.0 工作记录与技术文档
 
-**最后更新**：2026-05-17
-**版本**：1.2.1
-**状态**：v1.2.1 — 新增跌倒、起身、玩手机三类事件解析与显示、报警设置新增对应开关
+**最后更新**：2026-05-21
+**版本**：1.3.0
+**状态**：v1.3.0 — MJPEG 流批量缓冲区读取优化，降低多摄像头画面卡顿；新增带宽监控
 
 ---
 
@@ -179,11 +179,21 @@ disconnectDevice() / removeDevice()
 ```
 OkHttp GET /video
   → multipart/x-mixed-replace 流
-  → 逐字节读取到缓冲区
-  → 按 boundary 分割帧
-  → 解析 Content-Length 头部
+  → 64KB 批量缓冲区读取
+  → 按 JPEG 起始/结束标志搜索 SOI (0xFFD8) / EOI (0xFFD9)
   → 提取 JPEG 二进制块
   → onFrame(ByteArray) 回调
+```
+
+#### 帧率限制
+
+为防止 TCP 缓冲区排空时突发发射旧帧导致画面延迟，MjpegClient 限制帧发射速率（最大 20fps）。当检测到帧到达过快（间隔 < 50ms），自动丢弃多余帧，确保下游解码器只处理实时帧。
+
+#### 带宽监控
+
+读线程每 5 秒统计一次接收字节量，输出 KB/s 和 Mbps 到 logcat：
+```
+MjpegClient: Bandwidth: 512 KB/s (4 Mbps)
 ```
 
 #### 重连策略
@@ -198,7 +208,7 @@ OkHttp GET /video
 |------|-----|------|
 | 连接超时 | 10s | - |
 | 读取超时 | 0（无超时） | 流式读取不超时 |
-| 读取缓冲区 | 64KB | 每次 read() 大小 |
+| 读取缓冲区 | 64KB | 批量 read(buffer) 大小，替代逐字节读取 |
 | 最大累积缓冲 | 2MB | 防内存溢出 |
 
 ### 3.3 ApiClient — REST API 客户端
@@ -423,6 +433,9 @@ EventPoller 发现新事件
 | cry | `检测到婴儿哭声` | 连续振 1000ms |
 | sleep | `宝宝睡着了` | 短振 100ms |
 | wake_up | `宝宝睡醒了` | 短振 100ms |
+| fall | `检测到有人摔倒` | 连续振 1000ms |
+| get_up | `有人站起来了` | 短振 100ms |
+| phone | `有人在玩手机（XX%）` | 短振 200ms |
 
 ---
 
@@ -681,6 +694,21 @@ adb install app-debug.apk
 ---
 
 ## 13. 版本记录
+
+### v1.3.0 (2026-05-21)
+
+#### 性能优化
+
+1. **MJPEG 流批量缓冲区读取** — 将 `readFramesByJpegMarkers()` 从逐字节 `inputStream.read()` 改为 64KB 批量 `inputStream.read(buffer)` 读取，大幅减少 JNI/IO 调用次数，降低多摄像头同时解码时的 CPU 开销
+2. **带宽监控** — 读线程每 5 秒统计当前摄像头接收数据速率，输出 KB/s 和 Mbps 到 logcat，帮助判断 2.4G WiFi 是否带宽不足
+3. **MjpegView 解码优化** — RGB565 解码（内存减半）、Bitmap 双缓冲复用（消除 GC）、帧丢弃（过时帧跳过显示）
+4. **帧率限制** — MjpegClient 帧发射速率限制（最大 20fps），防止 TCP 缓冲区排空时突发发射旧帧导致画面延迟
+
+#### 版本号
+
+- `versionName = "1.3.0"`
+
+---
 
 ### v1.2.1 (2026-05-20)
 

@@ -257,6 +257,7 @@ private fun CameraGrid(
                             onFullscreen = { onSetFullscreen(state.device.id) },
                             onShowEvents = { onShowEvents(state.device.id) },
                             onDelete = { onDeleteCamera(state.device.id) },
+                            onEdit = { onEditCamera(state.device.id) },
                             onPowerToggle = { onPowerToggle(state.device.id) },
                             onSwitchCamera = { cameraId -> onSwitchCamera(state.device.id, cameraId) },
                             onDragStart = { draggedIndex = index },

@@ -39,6 +39,8 @@ class MjpegClient(
     companion object {
         private const val TAG = "MjpegClient"
         private const val READ_BUFFER_SIZE = 65536
+        // Frame rate limiter: prevents emitting old frames from TCP buffer drain
+        private const val MIN_FRAME_INTERVAL_MS = 50L  // cap at ~20fps
         // JPEG markers
         private const val SOI_MARKER: Short = 0xFFD8.toShort()  // Start of Image
         private const val EOI_MARKER: Short = 0xFFD9.toShort()  // End of Image
@@ -100,50 +102,74 @@ class MjpegClient(
      * This approach does NOT rely on boundary parsing.
      */
     private var frameCount = 0
+    private val bandwidthBytes = java.util.concurrent.atomic.AtomicLong(0)
+    private var lastBandwidthLogTime = 0L
 
     private fun readFramesByJpegMarkers(inputStream: InputStream) {
-        val frameBuffer = java.io.ByteArrayOutputStream(256 * 1024) // 256KB initial
-        var foundSOI = false
-        var byte0 = -1  // Previous byte
-        var skippedHeaderBytes = 0
+        val buffer = ByteArray(READ_BUFFER_SIZE)
+        val frameBuffer = java.io.ByteArrayOutputStream(512 * 1024) // 512KB initial
+        var prevByte = -1
+        var reading = false
+        var lastFrameEmitTime = 0L  // frame rate limiter
+        lastBandwidthLogTime = System.currentTimeMillis()
 
         while (running.get()) {
-            val b = inputStream.read()
-            if (b == -1) {
+            val bytesRead = inputStream.read(buffer)
+            if (bytesRead == -1) {
                 Log.d(TAG, "Stream ended (read returned -1)")
                 break
             }
 
-            if (!foundSOI) {
-                skippedHeaderBytes++
-                // Look for JPEG SOI: 0xFF 0xD8
-                if (byte0 == 0xFF && b == 0xD8) {
-                    foundSOI = true
-                    frameBuffer.reset()
-                    frameBuffer.write(0xFF)
-                    frameBuffer.write(0xD8)
-                    skippedHeaderBytes = 0
-                }
-                byte0 = b
-            } else {
-                // Collect bytes until EOI: 0xFF 0xD9
-                frameBuffer.write(b)
-                if (byte0 == 0xFF && b == 0xD9) {
-                    // Complete frame found
-                    val jpegData = frameBuffer.toByteArray()
-                    if (jpegData.size > 100) { // Ignore tiny invalid frames
-                        frameCount++
-                        if (frameCount <= 3 || frameCount % 100 == 0) {
-                            Log.d(TAG, "Frame #$frameCount received: ${jpegData.size} bytes")
-                        }
-                        onFrame(jpegData)
-                    } else {
-                        Log.w(TAG, "Skipped small frame: ${jpegData.size} bytes")
+            bandwidthBytes.addAndGet(bytesRead.toLong())
+            logBandwidth()
+
+            for (i in 0 until bytesRead) {
+                val b = buffer[i].toInt() and 0xFF
+
+                if (!reading) {
+                    // Look for JPEG SOI: 0xFF 0xD8
+                    if (prevByte == 0xFF && b == 0xD8) {
+                        reading = true
+                        frameBuffer.reset()
+                        frameBuffer.write(0xFF)
+                        frameBuffer.write(0xD8)
                     }
-                    foundSOI = false
+                    prevByte = b
+                } else {
+                    // Collect bytes until EOI: 0xFF 0xD9
+                    frameBuffer.write(b)
+                    if (prevByte == 0xFF && b == 0xD9) {
+                        val jpegData = frameBuffer.toByteArray()
+                        if (jpegData.size > 100) {
+                            frameCount++
+                            if (frameCount <= 3 || frameCount % 100 == 0) {
+                                Log.d(TAG, "Frame #$frameCount received: ${jpegData.size} bytes")
+                            }
+                            // Frame rate limiter: drop frames arriving too fast
+                            // (TCP buffer drain sends bursts of old frames)
+                            val now = System.currentTimeMillis()
+                            if (now - lastFrameEmitTime >= MIN_FRAME_INTERVAL_MS) {
+                                lastFrameEmitTime = now
+                                onFrame(jpegData)
+                            }
+                        }
+                        reading = false
+                    }
+                    prevByte = b
                 }
-                byte0 = b
             }
+        }
+    }
+
+    private fun logBandwidth() {
+        val now = System.currentTimeMillis()
+        if (now - lastBandwidthLogTime >= 5000) {
+            val bytes = bandwidthBytes.getAndSet(0)
+            val elapsed = now - lastBandwidthLogTime
+            val kbps = bytes * 1000 / elapsed / 1024
+            val mbps = kbps * 8 / 1024
+            Log.d(TAG, "Bandwidth: $kbps KB/s ($mbps Mbps)")
+            lastBandwidthLogTime = now
         }
     }
 
