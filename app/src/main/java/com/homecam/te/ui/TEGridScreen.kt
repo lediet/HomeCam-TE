@@ -33,6 +33,9 @@ fun TEGridScreen(
     onEditCamera: (String) -> Unit = {},
     onPowerToggle: (String) -> Unit = {},
     onSwitchCamera: (deviceId: String, cameraId: String) -> Unit = { _, _ -> },
+    onShowVideoHistory: (String) -> Unit = {},
+    onStreamFormatChange: (deviceId: String, format: String) -> Unit = { _, _ -> },
+    streamFormats: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val deviceCount = cameraStates.size
@@ -101,6 +104,9 @@ fun TEGridScreen(
                 onEditCamera = onEditCamera,
                 onPowerToggle = onPowerToggle,
                 onSwitchCamera = onSwitchCamera,
+                onShowVideoHistory = onShowVideoHistory,
+                onStreamFormatChange = onStreamFormatChange,
+                streamFormats = streamFormats,
                 isEditMode = false,
                 modifier = Modifier.padding(padding)
             )
@@ -118,6 +124,9 @@ private fun CameraGrid(
     onEditCamera: (String) -> Unit = {},
     onPowerToggle: (String) -> Unit = {},
     onSwitchCamera: (deviceId: String, cameraId: String) -> Unit = { _, _ -> },
+    onShowVideoHistory: (String) -> Unit = {},
+    onStreamFormatChange: (deviceId: String, format: String) -> Unit = { _, _ -> },
+    streamFormats: Map<String, String> = emptyMap(),
     isEditMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -153,6 +162,9 @@ private fun CameraGrid(
                         onEdit = { onEditCamera(state.device.id) },
                         onPowerToggle = { onPowerToggle(state.device.id) },
                         onSwitchCamera = { cameraId -> onSwitchCamera(state.device.id, cameraId) },
+                        onShowVideoHistory = { onShowVideoHistory(state.device.id) },
+                        onStreamFormatChange = { format -> onStreamFormatChange(state.device.id, format) },
+                        streamFormat = streamFormats[state.device.id] ?: "mjpg",
                         onDragStart = { draggedIndex = index },
                         onDrag = { offset ->
                             if (draggedIndex >= 0) {
@@ -191,6 +203,8 @@ private fun CameraGrid(
                             onEdit = { onEditCamera(state1.device.id) },
                             onPowerToggle = { onPowerToggle(state1.device.id) },
                             onSwitchCamera = { cameraId -> onSwitchCamera(state1.device.id, cameraId) },
+                            onShowVideoHistory = { onShowVideoHistory(state1.device.id) },
+                            streamFormat = streamFormats[state1.device.id] ?: "mjpg",
                             onDragStart = { draggedIndex = index },
                             onDrag = { offset ->
                                 if (draggedIndex >= 0) {
@@ -224,6 +238,8 @@ private fun CameraGrid(
                             onEdit = { onEditCamera(state2.device.id) },
                             onPowerToggle = { onPowerToggle(state2.device.id) },
                             onSwitchCamera = { cameraId -> onSwitchCamera(state2.device.id, cameraId) },
+                            onShowVideoHistory = { onShowVideoHistory(state2.device.id) },
+                            streamFormat = streamFormats[state2.device.id] ?: "mjpg",
                             onDragStart = { draggedIndex = index + 1 },
                             onDrag = { offset ->
                                 if (draggedIndex >= 0) {
@@ -260,6 +276,8 @@ private fun CameraGrid(
                             onEdit = { onEditCamera(state.device.id) },
                             onPowerToggle = { onPowerToggle(state.device.id) },
                             onSwitchCamera = { cameraId -> onSwitchCamera(state.device.id, cameraId) },
+                            onShowVideoHistory = { onShowVideoHistory(state.device.id) },
+                            streamFormat = streamFormats[state.device.id] ?: "mjpg",
                             onDragStart = { draggedIndex = index },
                             onDrag = { offset ->
                                 if (draggedIndex >= 0) {

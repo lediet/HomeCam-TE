@@ -106,6 +106,25 @@ class CameraRepository {
             }
         }
 
+        // Fetch device status periodically (rtspEnabled, mjpgEnabled, etc.)
+        scope.launch {
+            while (isActive) {
+                delay(5000)
+                apiClient.getStatus().onSuccess { status ->
+                    Log.d("CameraRepo", "Status poll for ${device.id}: rtspEnabled=${status.rtspEnabled}, mjpgEnabled=${status.mjpgEnabled}")
+                    updateCameraState(device.id) {
+                        it.copy(
+                            isPoweredOn = status.cameraPowered,
+                            rtspEnabled = status.rtspEnabled ?: it.rtspEnabled,
+                            rtspUrl = status.rtspUrl ?: it.rtspUrl,
+                            mjpgEnabled = status.mjpgEnabled ?: it.mjpgEnabled,
+                            currentCameraId = status.currentCameraId.ifEmpty { it.currentCameraId }
+                        )
+                    }
+                }
+            }
+        }
+
         connections[device.id] = CameraConnection(
             device = device,
             apiClient = apiClient,
@@ -139,6 +158,12 @@ class CameraRepository {
 
     fun disconnectAll() {
         connections.keys.toList().forEach { disconnectDevice(it) }
+    }
+
+    /** Get video list for a device */
+    suspend fun getVideos(deviceId: String): Result<List<VideoRecord>> {
+        val apiClient = connections[deviceId]?.apiClient ?: return Result.failure(Exception("Device not connected"))
+        return apiClient.getVideos()
     }
 
     /** Get ApiClient for a device (for controls: power, switch) */

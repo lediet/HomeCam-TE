@@ -60,6 +60,24 @@ class ApiClient(private val baseUrl: String) {
         }
     }
 
+    /** GET /api/videos — video history list */
+    suspend fun getVideos(): Result<List<VideoRecord>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url(url("/api/videos")).get().build()
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val body = response.body?.string() ?: "[]"
+                val type = object : TypeToken<List<VideoRecord>>() {}.type
+                val videos: List<VideoRecord> = gson.fromJson(body, type)
+                Result.success(videos)
+            } else {
+                Result.failure(Exception("HTTP \${response.code}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /** GET /api/cameras — available cameras list */
     suspend fun getCameras(): Result<List<CameraInfo>> = withContext(Dispatchers.IO) {
         try {

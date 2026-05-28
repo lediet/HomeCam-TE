@@ -1,11 +1,13 @@
-# Homecam-TE v1.2.1
+# Homecam-TE v1.3.1
 
 HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeCam 设备的 MJPEG 视频流，支持事件监控、语音+振动报警和摄像头控制。
 
 ## 功能
 
 - **多设备监控** — 最多同时显示多台 HomeCam 设备，自适应网格布局（1 台单列，2+ 台双列）
-- **MJPEG 实时流** — 每设备独立连接，互不阻塞，9:16 竖屏比例 FIT_CENTER 显示
+- **MJPEG/RTSP 实时流** — 每设备独立连接，支持 MJPEG 和 RTSP 双协议，9:16 竖屏比例 FIT_CENTER 显示
+- **历史录像查看** - 点击文件夹图标进入历史录像页面，上半部分录像列表 + 下半部分 ExoPlayer 播放器
+- **RTSP 视频流切换** - 长按菜单选择 MJPG 或 RTSP 流格式，按设备记忆选择
 - **UDP 自动发现** — 局域网广播自动搜索 HomeCam 设备（单 socket + 子网定向广播）
 - **事件追踪** — 轮询事件日志，增量更新，底部弹窗查看
 - **语音报警** — 中文 TTS 播报事件类型（进入/离开/哭声/睡眠）
@@ -32,6 +34,7 @@ HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeC
 | 数据库 | Room 2.6.1 + KSP |
 | JSON | Gson 2.10.1 |
 | 协程 | Kotlinx Coroutines 1.7.3 |
+| 视频播放 | ExoPlayer (Media3) 1.4.0 |
 
 ## 构建要求
 
@@ -110,6 +113,9 @@ com.homecam.te/
     ├── TEGridScreen.kt     # 主网格屏幕
     ├── CameraCard.kt       # 摄像头卡片
     ├── MjpegView.kt        # MJPEG 渲染组件
+    ├── RtspView.kt         # RTSP 渲染组件（ExoPlayer）
+    ├── VideoPlayerView.kt  # MP4 播放器（ExoPlayer）
+    ├── VideoHistoryScreen.kt # 历史录像页面
     ├── EventSheet.kt       # 事件弹窗
     ├── AddCameraDialog.kt  # 添加对话框
 ├── EditCameraDialog.kt # 编辑对话框

@@ -43,6 +43,8 @@ fun HomecamTEApp() {
 
     var currentScreen by remember { mutableStateOf("main") }
     var editingDeviceId by remember { mutableStateOf<String?>(null) }
+    var videoHistoryDeviceId by remember { mutableStateOf<String?>(null) }
+    val streamFormats by viewModel.streamFormats.collectAsState()
 
     // Double-back exit
     var backPressTime = 0L
@@ -65,6 +67,11 @@ fun HomecamTEApp() {
         }
     }
 
+    // Handle back press in video history
+    BackHandler(enabled = videoHistoryDeviceId != null) {
+        videoHistoryDeviceId = null
+    }
+
     // Handle back press in fullscreen
     BackHandler(enabled = fullscreenDeviceId != null) {
         viewModel.setFullscreen(null)
@@ -83,8 +90,23 @@ fun HomecamTEApp() {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { scaffoldPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            when (currentScreen) {
-                "settings" -> {
+            when {
+                videoHistoryDeviceId != null -> {
+                    val devId = videoHistoryDeviceId!!
+                    val state = cameraStates[devId]
+                    if (state != null) {
+                        VideoHistoryScreen(
+                            deviceName = state.device.name.ifEmpty { state.device.ip },
+                            deviceIp = state.device.ip,
+                            devicePort = state.device.port,
+                            videos = emptyList(),
+                            onBack = { videoHistoryDeviceId = null },
+                            onFetchVideos = { viewModel.repository.getVideos(devId).getOrDefault(emptyList()) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                currentScreen == "settings" -> {
                     SettingsScreen(
                         settings = alertSettings,
                         onUpdateSettings = { viewModel.updateAlertSettings(it) },
@@ -104,6 +126,9 @@ fun HomecamTEApp() {
                         onDeleteCamera = { viewModel.removeDevice(it) },
                         onEditCamera = { deviceId -> editingDeviceId = deviceId },
                         onPowerToggle = { deviceId -> viewModel.setPower(deviceId, !(cameraStates[deviceId]?.isPoweredOn ?: true)) },
+                        onShowVideoHistory = { videoHistoryDeviceId = it },
+                        onStreamFormatChange = { deviceId, format -> viewModel.setStreamFormat(deviceId, format) },
+                        streamFormats = streamFormats,
                         onSwitchCamera = { deviceId, cameraId ->
                             val s = cameraStates[deviceId]
                             val logicalId = s?.availableCameras?.find { it.cameraId == cameraId }?.logicalCameraId ?: cameraId

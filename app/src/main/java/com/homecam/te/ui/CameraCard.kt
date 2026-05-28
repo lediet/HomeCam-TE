@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Log
 import com.homecam.te.model.CameraState
 import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
@@ -27,6 +28,9 @@ import java.util.Date
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
 
 @Composable
 fun CameraCard(
@@ -41,10 +45,14 @@ fun CameraCard(
     onDragStart: () -> Unit = {},
     onDrag: (Offset) -> Unit = {},
     onDragEnd: () -> Unit = {},
+    onShowVideoHistory: () -> Unit = {},
+    onStreamFormatChange: (String) -> Unit = {},
+    streamFormat: String = "mjpg",
     isEditMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showFormatDialog by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         Card(
@@ -70,10 +78,17 @@ fun CameraCard(
                     contentAlignment = Alignment.Center
                 ) {
                 if (cameraState.isOnline && cameraState.isPoweredOn) {
-                    MjpegView(
-                        frameFlow = frameFlow,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (streamFormat == "rtsp" && cameraState.rtspUrl.isNotEmpty()) {
+                        RtspView(
+                            rtspUrl = cameraState.rtspUrl,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        MjpegView(
+                            frameFlow = frameFlow,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 } else if (cameraState.isOnline) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
@@ -111,6 +126,13 @@ fun CameraCard(
                         }
                     )
                     DropdownMenuItem(
+                        text = { Text("视频流格式") },
+                        onClick = {
+                            showMenu = false
+                            showFormatDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text("删除设备", color = Color.Red) },
                         leadingIcon = {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
@@ -118,6 +140,49 @@ fun CameraCard(
                         onClick = {
                             showMenu = false
                             onDelete()
+                        }
+                    )
+                }
+
+                // Stream format selection dialog
+                if (showFormatDialog) {
+                    Log.d("CameraCard", "Current stream format: " + streamFormat)
+                    val rtspEnabled = cameraState.rtspEnabled
+                    var tempFormat by remember(showFormatDialog) { mutableStateOf(streamFormat) }
+                    AlertDialog(
+                        onDismissRequest = { showFormatDialog = false },
+                        title = { Text("视频流格式") },
+                        text = {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = tempFormat == "mjpg",
+                                        onClick = { tempFormat = "mjpg" }
+                                    )
+                                    Text("MJPG", modifier = Modifier.padding(start = 8.dp))
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = tempFormat == "rtsp",
+                                        enabled = rtspEnabled,
+                                        onClick = { tempFormat = "rtsp" }
+                                    )
+                                    Text(
+                                        if (rtspEnabled) "RTSP" else "RTSP（服务器端未开启）",
+                                        modifier = Modifier.padding(start = 8.dp),
+                                        color = if (rtspEnabled) LocalContentColor.current else Color.Gray
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                Log.d("CameraCard", "Stream format changed to: " + tempFormat)
+                                onStreamFormatChange(tempFormat)
+                                showFormatDialog = false
+                            }) {
+                                Text("确定")
+                            }
                         }
                     )
                 }
@@ -207,6 +272,7 @@ fun CameraCard(
             StatusBar(
                 cameraState = cameraState,
                 onExpand = onShowEvents,
+                onShowVideoHistory = onShowVideoHistory,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -238,6 +304,7 @@ fun CameraCard(
 private fun StatusBar(
     cameraState: CameraState,
     onExpand: () -> Unit,
+    onShowVideoHistory: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -272,6 +339,13 @@ private fun StatusBar(
                 )
             }
 
+            IconButton(onClick = onShowVideoHistory, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = "历史视频",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             IconButton(onClick = onExpand, modifier = Modifier.size(24.dp)) {
                 Icon(
                     imageVector = Icons.Default.ExpandMore,

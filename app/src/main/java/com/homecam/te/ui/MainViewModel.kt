@@ -2,6 +2,7 @@ package com.homecam.te.ui
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.homecam.te.data.CameraRepository
@@ -43,6 +44,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Event sheet state */
     private val _sheetDeviceId = MutableStateFlow<String?>(null)
     val sheetDeviceId: StateFlow<String?> = _sheetDeviceId.asStateFlow()
+
+    /** Stream format settings per device */
+    private val _streamFormats = MutableStateFlow<Map<String, String>>(emptyMap())
+    val streamFormats: StateFlow<Map<String, String>> = _streamFormats.asStateFlow()
 
     /** Alert settings (mirrored in AlertManager) */
     private val prefs = application.getSharedPreferences("homecam_te_prefs", Context.MODE_PRIVATE)
@@ -212,6 +217,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _sheetDeviceId.value = null
     }
 
+    // ----- Stream Format -----
+
+    fun setStreamFormat(deviceId: String, format: String) {
+        Log.d("MainViewModel", "setStreamFormat: $deviceId -> $format")
+        _streamFormats.value = _streamFormats.value + (deviceId to format)
+    }
+
     // ----- Camera Controls -----
 
     fun setPower(deviceId: String, on: Boolean) {
@@ -270,6 +282,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSnackbar() {
         _snackbarMessage.value = null
+    }
+
+    fun getVideoList(deviceId: String): kotlinx.coroutines.flow.StateFlow<List<VideoRecord>> {
+        val flow = MutableStateFlow<List<VideoRecord>>(emptyList())
+        viewModelScope.launch {
+            repository.getVideos(deviceId).onSuccess { videos ->
+                flow.value = videos.sortedByDescending { it.timestamp }
+            }
+        }
+        return flow.asStateFlow()
     }
 
     override fun onCleared() {

@@ -92,4 +92,9 @@ dependencies {
 
     // Gson
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // ExoPlayer (Media3) for RTSP and MP4 playback
+    implementation("androidx.media3:media3-exoplayer:1.4.0")
+    implementation("androidx.media3:media3-exoplayer-rtsp:1.4.0")
+    implementation("androidx.media3:media3-ui:1.4.0")
 }

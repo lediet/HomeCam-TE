@@ -26,7 +26,10 @@ data class CameraState(
     val latestEventLabel: String = "",
     val events: List<EventItem> = emptyList(),
     val availableCameras: List<CameraInfo> = emptyList(),
-    val currentCameraId: String = ""
+    val currentCameraId: String = "",
+    val rtspEnabled: Boolean = false,
+    val rtspUrl: String = "",
+    val mjpgEnabled: Boolean = true
 )
 
 /**
@@ -84,7 +87,13 @@ data class StatusResponse(
     @SerializedName("current_camera_id")
     val currentCameraId: String = "",
     @SerializedName("current_logical_camera_id")
-    val currentLogicalCameraId: String = ""
+    val currentLogicalCameraId: String = "",
+    @SerializedName("rtsp_url")
+    val rtspUrl: String? = null,
+    @SerializedName("rtsp_enabled")
+    val rtspEnabled: Boolean? = false,
+    @SerializedName("mjpg_enabled")
+    val mjpgEnabled: Boolean? = true
 )
 
 /**
@@ -105,4 +114,17 @@ data class CameraPowerResponse(
     val success: Boolean = false,
     val power: Boolean = false,
     val error: String = ""
+)
+
+/**
+ * Video record from GET /api/videos
+ */
+data class VideoRecord(
+    val fileName: String = "",
+    val timestamp: Long = 0L,
+    val eventType: String = "",
+    val eventLabel: String = "",
+    val durationSec: Int = 0,
+    val fileSize: Long = 0L,
+    val url: String = ""
 )
