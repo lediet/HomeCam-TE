@@ -35,7 +35,9 @@ fun TEGridScreen(
     onSwitchCamera: (deviceId: String, cameraId: String) -> Unit = { _, _ -> },
     onShowVideoHistory: (String) -> Unit = {},
     onStreamFormatChange: (deviceId: String, format: String) -> Unit = { _, _ -> },
+    onVideoRotationChange: (deviceId: String, rotation: Int) -> Unit = { _, _ -> },
     streamFormats: Map<String, String> = emptyMap(),
+    videoRotations: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val deviceCount = cameraStates.size
@@ -106,7 +108,9 @@ fun TEGridScreen(
                 onSwitchCamera = onSwitchCamera,
                 onShowVideoHistory = onShowVideoHistory,
                 onStreamFormatChange = onStreamFormatChange,
+                onVideoRotationChange = onVideoRotationChange,
                 streamFormats = streamFormats,
+                videoRotations = videoRotations,
                 isEditMode = false,
                 modifier = Modifier.padding(padding)
             )
@@ -126,12 +130,13 @@ private fun CameraGrid(
     onSwitchCamera: (deviceId: String, cameraId: String) -> Unit = { _, _ -> },
     onShowVideoHistory: (String) -> Unit = {},
     onStreamFormatChange: (deviceId: String, format: String) -> Unit = { _, _ -> },
+    onVideoRotationChange: (deviceId: String, rotation: Int) -> Unit = { _, _ -> },
     streamFormats: Map<String, String> = emptyMap(),
+    videoRotations: Map<String, Int> = emptyMap(),
     isEditMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val count = cameraStates.size
-    val columns = if (count == 1) 1 else 2
     val scrollState = rememberScrollState()
 
     var order by remember(cameraStates) { mutableStateOf(cameraStates.indices.toList()) }
@@ -148,11 +153,38 @@ private fun CameraGrid(
     }
 
     Column(modifier = modifier.padding(4.dp).verticalScroll(scrollState)) {
-        var index = 0
-        while (index < count) {
+        val rows = remember(orderedStates, videoRotations) {
+            val result = mutableListOf<List<CameraState>>()
+            var i = 0
+            while (i < orderedStates.size) {
+                val rot = videoRotations[orderedStates[i].device.id] ?: 0
+                if (rot == 90 || rot == 270) {
+                    result.add(listOf(orderedStates[i]))
+                    i++
+                } else {
+                    if (i + 1 < orderedStates.size) {
+                        val nextRot = videoRotations[orderedStates[i + 1].device.id] ?: 0
+                        if (nextRot == 90 || nextRot == 270) {
+                            result.add(listOf(orderedStates[i]))
+                            i++
+                        } else {
+                            result.add(listOf(orderedStates[i], orderedStates[i + 1]))
+                            i += 2
+                        }
+                    } else {
+                        result.add(listOf(orderedStates[i]))
+                        i++
+                    }
+                }
+            }
+            result
+        }
+
+        var flatIndex = 0
+        rows.forEach { rowStates ->
             Row(modifier = Modifier.fillMaxWidth()) {
-                if (columns == 1) {
-                    val state = orderedStates[index]
+                if (rowStates.size == 1) {
+                    val state = rowStates[0]
                     CameraCard(
                         cameraState = state,
                         frameFlow = repository.getFrameFlow(state.device.id),
@@ -165,7 +197,9 @@ private fun CameraGrid(
                         onShowVideoHistory = { onShowVideoHistory(state.device.id) },
                         onStreamFormatChange = { format -> onStreamFormatChange(state.device.id, format) },
                         streamFormat = streamFormats[state.device.id] ?: "mjpg",
-                        onDragStart = { draggedIndex = index },
+                        onVideoRotationChange = { rotation -> onVideoRotationChange(state.device.id, rotation) },
+                        videoRotation = videoRotations[state.device.id] ?: 0,
+                        onDragStart = { draggedIndex = flatIndex },
                         onDrag = { offset ->
                             if (draggedIndex >= 0) {
                                 dragAccumulated += offset.y
@@ -189,122 +223,85 @@ private fun CameraGrid(
                         isEditMode = isEditMode,
                         modifier = Modifier.weight(1f)
                     )
-                    index++
+                    flatIndex++
                 } else {
-                    if (index + 1 < count) {
-                        val state1 = orderedStates[index]
-                        val state2 = orderedStates[index + 1]
-                        CameraCard(
-                            cameraState = state1,
-                            frameFlow = repository.getFrameFlow(state1.device.id),
-                            onFullscreen = { onSetFullscreen(state1.device.id) },
-                            onShowEvents = { onShowEvents(state1.device.id) },
-                            onDelete = { onDeleteCamera(state1.device.id) },
-                            onEdit = { onEditCamera(state1.device.id) },
-                            onPowerToggle = { onPowerToggle(state1.device.id) },
-                            onSwitchCamera = { cameraId -> onSwitchCamera(state1.device.id, cameraId) },
-                            onShowVideoHistory = { onShowVideoHistory(state1.device.id) },
-                            streamFormat = streamFormats[state1.device.id] ?: "mjpg",
-                            onDragStart = { draggedIndex = index },
-                            onDrag = { offset ->
-                                if (draggedIndex >= 0) {
-                                    dragAccumulated += offset.y
-                                    val rowHeight = 400f
-                                    while (dragAccumulated > rowHeight && draggedIndex < count - 1) {
-                                        moveItem(draggedIndex, draggedIndex + 1)
-                                        dragAccumulated -= rowHeight
-                                        draggedIndex++
-                                    }
-                                    while (dragAccumulated < -rowHeight && draggedIndex > 0) {
-                                        moveItem(draggedIndex, draggedIndex - 1)
-                                        dragAccumulated += rowHeight
-                                        draggedIndex--
-                                    }
+                    val state1 = rowStates[0]
+                    val state2 = rowStates[1]
+                    CameraCard(
+                        cameraState = state1,
+                        frameFlow = repository.getFrameFlow(state1.device.id),
+                        onFullscreen = { onSetFullscreen(state1.device.id) },
+                        onShowEvents = { onShowEvents(state1.device.id) },
+                        onDelete = { onDeleteCamera(state1.device.id) },
+                        onEdit = { onEditCamera(state1.device.id) },
+                        onPowerToggle = { onPowerToggle(state1.device.id) },
+                        onSwitchCamera = { cameraId -> onSwitchCamera(state1.device.id, cameraId) },
+                        onShowVideoHistory = { onShowVideoHistory(state1.device.id) },
+                        streamFormat = streamFormats[state1.device.id] ?: "mjpg",
+                        onVideoRotationChange = { rotation -> onVideoRotationChange(state1.device.id, rotation) },
+                        videoRotation = videoRotations[state1.device.id] ?: 0,
+                        onDragStart = { draggedIndex = flatIndex },
+                        onDrag = { offset ->
+                            if (draggedIndex >= 0) {
+                                dragAccumulated += offset.y
+                                val rowHeight = 400f
+                                while (dragAccumulated > rowHeight && draggedIndex < count - 1) {
+                                    moveItem(draggedIndex, draggedIndex + 1)
+                                    dragAccumulated -= rowHeight
+                                    draggedIndex++
                                 }
-                            },
-                            onDragEnd = {
-                                draggedIndex = -1
-                                dragAccumulated = 0f
-                            },
-                            isEditMode = isEditMode,
-                            modifier = Modifier.weight(1f)
-                        )
-                        CameraCard(
-                            cameraState = state2,
-                            frameFlow = repository.getFrameFlow(state2.device.id),
-                            onFullscreen = { onSetFullscreen(state2.device.id) },
-                            onShowEvents = { onShowEvents(state2.device.id) },
-                            onDelete = { onDeleteCamera(state2.device.id) },
-                            onEdit = { onEditCamera(state2.device.id) },
-                            onPowerToggle = { onPowerToggle(state2.device.id) },
-                            onSwitchCamera = { cameraId -> onSwitchCamera(state2.device.id, cameraId) },
-                            onShowVideoHistory = { onShowVideoHistory(state2.device.id) },
-                            streamFormat = streamFormats[state2.device.id] ?: "mjpg",
-                            onDragStart = { draggedIndex = index + 1 },
-                            onDrag = { offset ->
-                                if (draggedIndex >= 0) {
-                                    dragAccumulated += offset.y
-                                    val rowHeight = 400f
-                                    while (dragAccumulated > rowHeight && draggedIndex < count - 1) {
-                                        moveItem(draggedIndex, draggedIndex + 1)
-                                        dragAccumulated -= rowHeight
-                                        draggedIndex++
-                                    }
-                                    while (dragAccumulated < -rowHeight && draggedIndex > 0) {
-                                        moveItem(draggedIndex, draggedIndex - 1)
-                                        dragAccumulated += rowHeight
-                                        draggedIndex--
-                                    }
+                                while (dragAccumulated < -rowHeight && draggedIndex > 0) {
+                                    moveItem(draggedIndex, draggedIndex - 1)
+                                    dragAccumulated += rowHeight
+                                    draggedIndex--
                                 }
-                            },
-                            onDragEnd = {
-                                draggedIndex = -1
-                                dragAccumulated = 0f
-                            },
-                            isEditMode = isEditMode,
-                            modifier = Modifier.weight(1f)
-                        )
-                        index += 2
-                    } else {
-                        val state = orderedStates[index]
-                        CameraCard(
-                            cameraState = state,
-                            frameFlow = repository.getFrameFlow(state.device.id),
-                            onFullscreen = { onSetFullscreen(state.device.id) },
-                            onShowEvents = { onShowEvents(state.device.id) },
-                            onDelete = { onDeleteCamera(state.device.id) },
-                            onEdit = { onEditCamera(state.device.id) },
-                            onPowerToggle = { onPowerToggle(state.device.id) },
-                            onSwitchCamera = { cameraId -> onSwitchCamera(state.device.id, cameraId) },
-                            onShowVideoHistory = { onShowVideoHistory(state.device.id) },
-                            streamFormat = streamFormats[state.device.id] ?: "mjpg",
-                            onDragStart = { draggedIndex = index },
-                            onDrag = { offset ->
-                                if (draggedIndex >= 0) {
-                                    dragAccumulated += offset.y
-                                    val rowHeight = 400f
-                                    while (dragAccumulated > rowHeight && draggedIndex < count - 1) {
-                                        moveItem(draggedIndex, draggedIndex + 1)
-                                        dragAccumulated -= rowHeight
-                                        draggedIndex++
-                                    }
-                                    while (dragAccumulated < -rowHeight && draggedIndex > 0) {
-                                        moveItem(draggedIndex, draggedIndex - 1)
-                                        dragAccumulated += rowHeight
-                                        draggedIndex--
-                                    }
+                            }
+                        },
+                        onDragEnd = {
+                            draggedIndex = -1
+                            dragAccumulated = 0f
+                        },
+                        isEditMode = isEditMode,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CameraCard(
+                        cameraState = state2,
+                        frameFlow = repository.getFrameFlow(state2.device.id),
+                        onFullscreen = { onSetFullscreen(state2.device.id) },
+                        onShowEvents = { onShowEvents(state2.device.id) },
+                        onDelete = { onDeleteCamera(state2.device.id) },
+                        onEdit = { onEditCamera(state2.device.id) },
+                        onPowerToggle = { onPowerToggle(state2.device.id) },
+                        onSwitchCamera = { cameraId -> onSwitchCamera(state2.device.id, cameraId) },
+                        onShowVideoHistory = { onShowVideoHistory(state2.device.id) },
+                        streamFormat = streamFormats[state2.device.id] ?: "mjpg",
+                        onVideoRotationChange = { rotation -> onVideoRotationChange(state2.device.id, rotation) },
+                        videoRotation = videoRotations[state2.device.id] ?: 0,
+                        onDragStart = { draggedIndex = flatIndex + 1 },
+                        onDrag = { offset ->
+                            if (draggedIndex >= 0) {
+                                dragAccumulated += offset.y
+                                val rowHeight = 400f
+                                while (dragAccumulated > rowHeight && draggedIndex < count - 1) {
+                                    moveItem(draggedIndex, draggedIndex + 1)
+                                    dragAccumulated -= rowHeight
+                                    draggedIndex++
                                 }
-                            },
-                            onDragEnd = {
-                                draggedIndex = -1
-                                dragAccumulated = 0f
-                            },
-                            isEditMode = isEditMode,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        index++
-                    }
+                                while (dragAccumulated < -rowHeight && draggedIndex > 0) {
+                                    moveItem(draggedIndex, draggedIndex - 1)
+                                    dragAccumulated += rowHeight
+                                    draggedIndex--
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            draggedIndex = -1
+                            dragAccumulated = 0f
+                        },
+                        isEditMode = isEditMode,
+                        modifier = Modifier.weight(1f)
+                    )
+                    flatIndex += 2
                 }
             }
         }

@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -47,12 +48,15 @@ fun CameraCard(
     onDragEnd: () -> Unit = {},
     onShowVideoHistory: () -> Unit = {},
     onStreamFormatChange: (String) -> Unit = {},
+    onVideoRotationChange: (Int) -> Unit = {},
+    videoRotation: Int = 0,
     streamFormat: String = "mjpg",
     isEditMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showFormatDialog by remember { mutableStateOf(false) }
+    var showRotationDialog by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         Card(
@@ -66,7 +70,7 @@ fun CameraCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(9f / 16f)
+                        .aspectRatio(if (videoRotation == 90 || videoRotation == 270) 4f / 3f else 9f / 16f)
                         .pointerInput(isEditMode) {
                             if (!isEditMode) {
                                 detectTapGestures(
@@ -78,15 +82,16 @@ fun CameraCard(
                     contentAlignment = Alignment.Center
                 ) {
                 if (cameraState.isOnline && cameraState.isPoweredOn) {
+                    val rotation = videoRotation.toFloat()
                     if (streamFormat == "rtsp" && cameraState.rtspUrl.isNotEmpty()) {
                         RtspView(
                             rtspUrl = cameraState.rtspUrl,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize().rotate(rotation)
                         )
                     } else {
                         MjpegView(
                             frameFlow = frameFlow,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize().rotate(rotation)
                         )
                     }
                 } else if (cameraState.isOnline) {
@@ -123,6 +128,13 @@ fun CameraCard(
                         onClick = {
                             showMenu = false
                             onEdit()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("视频方向") },
+                        onClick = {
+                            showMenu = false
+                            showRotationDialog = true
                         }
                     )
                     DropdownMenuItem(
@@ -180,6 +192,38 @@ fun CameraCard(
                                 Log.d("CameraCard", "Stream format changed to: " + tempFormat)
                                 onStreamFormatChange(tempFormat)
                                 showFormatDialog = false
+                            }) {
+                                Text("确定")
+                            }
+                        }
+                    )
+                }
+
+                // Rotation selection dialog
+                if (showRotationDialog) {
+                    val rotationOptions = listOf(0, 90, 180, 270)
+                    var tempRotation by remember(showRotationDialog) { mutableIntStateOf(videoRotation) }
+                    AlertDialog(
+                        onDismissRequest = { showRotationDialog = false },
+                        title = { Text("视频方向") },
+                        text = {
+                            Column {
+                                rotationOptions.forEach { angle ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = tempRotation == angle,
+                                            onClick = { tempRotation = angle }
+                                        )
+                                        Text("${angle}°", modifier = Modifier.padding(start = 8.dp))
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                Log.d("CameraCard", "Video rotation changed to: " + tempRotation)
+                                onVideoRotationChange(tempRotation)
+                                showRotationDialog = false
                             }) {
                                 Text("确定")
                             }

@@ -49,10 +49,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _streamFormats = MutableStateFlow<Map<String, String>>(emptyMap())
     val streamFormats: StateFlow<Map<String, String>> = _streamFormats.asStateFlow()
 
-    /** Alert settings (mirrored in AlertManager) */
     private val prefs = application.getSharedPreferences("homecam_te_prefs", Context.MODE_PRIVATE)
+
+    /** Video rotation settings per device */
+    private val _videoRotations = MutableStateFlow<Map<String, Int>>(loadVideoRotations())
+    val videoRotations: StateFlow<Map<String, Int>> = _videoRotations.asStateFlow()
+
+    /** Alert settings (mirrored in AlertManager) */
     private val _alertSettings = MutableStateFlow(loadAlertSettings())
     val alertSettings: StateFlow<AlertSettings> = _alertSettings.asStateFlow()
+
+    private fun loadVideoRotations(): Map<String, Int> {
+        val map = mutableMapOf<String, Int>()
+        prefs.all.forEach { (key, value) ->
+            if (key.startsWith("video_rotation_") && value is Int) {
+                map[key.removePrefix("video_rotation_")] = value
+            }
+        }
+        return map
+    }
 
     private fun loadAlertSettings(): AlertSettings {
         return AlertSettings(
@@ -222,6 +237,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setStreamFormat(deviceId: String, format: String) {
         Log.d("MainViewModel", "setStreamFormat: $deviceId -> $format")
         _streamFormats.value = _streamFormats.value + (deviceId to format)
+    }
+
+    fun setVideoRotation(deviceId: String, rotation: Int) {
+        Log.d("MainViewModel", "setVideoRotation: $deviceId -> $rotation")
+        _videoRotations.value = _videoRotations.value + (deviceId to rotation)
+        prefs.edit().putInt("video_rotation_$deviceId", rotation).apply()
     }
 
     // ----- Camera Controls -----

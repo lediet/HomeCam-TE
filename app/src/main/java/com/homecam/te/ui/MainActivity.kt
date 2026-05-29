@@ -45,6 +45,7 @@ fun HomecamTEApp() {
     var editingDeviceId by remember { mutableStateOf<String?>(null) }
     var videoHistoryDeviceId by remember { mutableStateOf<String?>(null) }
     val streamFormats by viewModel.streamFormats.collectAsState()
+    val videoRotations by viewModel.videoRotations.collectAsState()
 
     // Double-back exit
     var backPressTime = 0L
@@ -128,7 +129,9 @@ fun HomecamTEApp() {
                         onPowerToggle = { deviceId -> viewModel.setPower(deviceId, !(cameraStates[deviceId]?.isPoweredOn ?: true)) },
                         onShowVideoHistory = { videoHistoryDeviceId = it },
                         onStreamFormatChange = { deviceId, format -> viewModel.setStreamFormat(deviceId, format) },
+                        onVideoRotationChange = { deviceId, rotation -> viewModel.setVideoRotation(deviceId, rotation) },
                         streamFormats = streamFormats,
+                        videoRotations = videoRotations,
                         onSwitchCamera = { deviceId, cameraId ->
                             val s = cameraStates[deviceId]
                             val logicalId = s?.availableCameras?.find { it.cameraId == cameraId }?.logicalCameraId ?: cameraId
