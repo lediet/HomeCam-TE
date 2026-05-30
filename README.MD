@@ -1,4 +1,4 @@
-# Homecam-TE v1.3.1
+# Homecam-TE v1.4.0
 
 HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeCam 设备的 MJPEG 视频流，支持事件监控、语音+振动报警和摄像头控制。
 
@@ -41,27 +41,6 @@ HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeC
 - Android Studio Hedgehog (2023.1.1+) 或 IntelliJ IDEA
 - JDK 17
 - Android SDK 34
-
-## 构建步骤
-
-```bash
-# 生成 Gradle Wrapper（如未生成）
-gradle wrapper --gradle-version 8.5
-
-# Debug APK
-./gradlew assembleDebug
-
-# APK 输出位置
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-或直接用 Android Studio 打开项目根目录，IDE 会自动处理依赖下载。
-
-## 安装
-
-```bash
-adb install app-debug.apk
-```
 
 ## 快速开始
 

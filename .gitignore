@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+app/build/
+local.properties
+
+# IDE
+.idea/workspace.xml
+.idea/shelf/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary / scratch files
+*.py
+mem*.txt
+test*.txt
+test*.py
+
+# APK
+*.apk
+*.aab
