@@ -14,6 +14,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import com.homecam.te.R
 import com.homecam.te.data.CameraRepository
 import com.homecam.te.model.CameraState
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +54,7 @@ fun TEGridScreen(
     modifier: Modifier = Modifier
 ) {
     val deviceCount = cameraStates.size
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -72,6 +86,12 @@ fun TEGridScreen(
                     }
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
+                    }
+                    IconButton(onClick = { showHelpDialog = true }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_help),
+                            contentDescription = "帮助"
+                        )
                     }
                 }
             )
@@ -114,6 +134,10 @@ fun TEGridScreen(
                 isEditMode = false,
                 modifier = Modifier.padding(padding)
             )
+        }
+
+        if (showHelpDialog) {
+            HelpDialog(onDismiss = { showHelpDialog = false })
         }
     }
 }
@@ -307,3 +331,80 @@ private fun CameraGrid(
         }
     }
 }
+
+@Composable
+private fun HelpDialog(onDismiss: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val qrBitmap = remember {
+        try {
+            context.assets.open("QR/QR.jpg").use { BitmapFactory.decodeStream(it) }
+        } catch (e: Exception) { null }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("关于 HomeCam-TE", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("软件说明", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("本软件配合HomeCam（https://github.com/lediet/HomeCam）使用，可以实现多个摄像头组播显示和日志提醒。", fontSize = 14.sp)
+                Spacer(Modifier.height(12.dp))
+
+                Text("开源说明", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("本项目完全开源、永久免费，无广告、所有数据纯本地传输运行，无任何后门和隐私风险，所有功能开放使用，无任何付费门槛。", fontSize = 14.sp)
+                Spacer(Modifier.height(12.dp))
+
+                Text("自愿支持", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("若你觉得工具实用，愿意支持开发者持续迭代、优化功能，可自愿打赏。\n赞赏纯属个人意愿，不会限制、影响任何软件功能。", fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+
+                qrBitmap?.let {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = "赞赏二维码",
+                            modifier = Modifier.width(160.dp).height(160.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+
+                Text("教程 & 源码地址", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("完整部署教程、源码文件、更新日志统一托管在 GitHub：", fontSize = 14.sp)
+                Text(
+                    text = "https://github.com/lediet/HomeCam-TE",
+                    color = Color(0xFF1976D2),
+                    fontSize = 14.sp,
+                    modifier = Modifier.clickable { uriHandler.openUri("https://github.com/lediet/HomeCam-TE") }
+                )
+                Spacer(Modifier.height(12.dp))
+
+                Text("交流反馈", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("项目相关问题、功能建议、Bug 反馈，请前往 GitHub 提交 Issue / 参与讨论。", fontSize = 14.sp)
+                Spacer(Modifier.height(12.dp))
+
+                Text("免责声明", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Red)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "本软件仅限个人家庭非商用学习与使用；\n" +
+                    "严禁用于偷拍、侵权、违法违规场景，违规使用产生的一切后果由使用者自行承担；\n" +
+                    "软件 AI 检测、监控功能仅作日常辅助参考，不可替代专业安防、监控设备，长期插电使用可能损耗您的电池；\n" +
+                    "使用者需自行保障设备、网络与数据安全，作者不对设备故障、数据丢失等问题承担责任。",
+                    fontSize = 14.sp
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        }
+    )
+}
+
