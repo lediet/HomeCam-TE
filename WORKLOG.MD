@@ -1,8 +1,8 @@
 # Homecam-TE v1.0.0 工作记录与技术文档
 
-**最后更新**：2026-05-28
-**版本**：1.3.1
-**状态**：v1.3.1 — 历史视频查看功能 + RTSP 视频流支持 + ExoPlayer 播放器集成
+**最后更新**：2026-06-04
+**版本**：1.4.1
+**状态**：v1.4.1 — 视频方向旋转 + 横向满宽模式 + 电量显示 + 帮助弹窗 + 使用说明页面
 
 ---
 
@@ -79,6 +79,7 @@ app/src/main/java/com/homecam/te/
     ├── AddCameraDialog.kt     # 手动添加摄像头对话框
     ├── EditCameraDialog.kt    # 编辑摄像头对话框
     ├── SettingsScreen.kt      # 设置页面
+    ├── UserManualScreen.kt    # 使用说明页面（WebView）
     └── theme/Theme.kt         # Material3 主题
 
 app/src/main/res/
@@ -476,7 +477,8 @@ data class CameraState(
     val currentCameraId: String = "",
     val rtspEnabled: Boolean = false,
     val rtspUrl: String = "",
-    val mjpgEnabled: Boolean = true
+    val mjpgEnabled: Boolean = true,
+    val batteryLevel: Int = -1
 )
 ```
 
@@ -510,24 +512,26 @@ data class EventItem(
 | 2~N 台 | 2 列 | 始终双列布局，奇数台时最后一张在左下角（右下角空位） |
 
 布局算法：
-- `columns = if (count == 1) 1 else 2`
+- 无横向卡片时：`columns = if (count == 1) 1 else 2`
 - 奇数台时最后一行仅左列有卡片，右列空位 `Spacer(weight(1f))` 填充
+- 横向卡片（旋转 90°/270°）单独构建行，每行渲染一张占满行宽；其余竖屏卡片保持双列配对
 
 ### 9.2 卡片结构
 
 ```
-+------------------------------------------+
-|[名称/IP]                      [电源]       |
-|   MJPEG/RTSP 视频画面 / 离线占位图         |
-|   (9:16 竖屏比例, FIT_CENTER)             |
-|                               [镜头切换]   |
-+------------------------------------------+
-|  最新事件文本   [文件夹]   [展开箭头 >]  |
-+------------------------------------------+
++----------------------------------------------------+
+|[名称/IP]   [电池 85%]                     [电源]    |
+|   MJPEG/RTSP 视频画面 / 离线占位图                  |
+|   (纵向: 9:16 / 横向: 4:3, Modifier.rotate)        |
+|                                          [镜头切换]  |
++----------------------------------------------------+
+|  最新事件文本                     [文件夹] [展开 >] |
++----------------------------------------------------+
 ```
 
-- 画面比例 9:16（竖屏），`FIT_CENTER` 缩放（不足留黑边，不裁剪）
-- 左上角悬浮显示设备名称（无名称显示 IP）
+- 画面比例：纵向（0°/180°）9:16；横向（90°/270°）4:3，`FIT_CENTER` 缩放
+- 视频内容应用 `Modifier.rotate(rotation)` 按设定角度旋转
+- 左上角悬浮显示设备名称（无名称显示 IP）+ 电池百分比（带电池图标）
 - 右上角电源开关按钮
 - 左下角镜头切换按钮（仅多镜头设备可见）
 - 底部状态栏只显示事件文本 + 展开箭头（不显示设备名称）
@@ -538,13 +542,16 @@ data class EventItem(
 | 操作 | 行为 |
 |------|------|
 | 点击画面 | 全屏预览 |
-| 长按画面 | 弹出菜单（编辑设备/视频流格式/删除设备） |
+| 长按画面 | 弹出菜单（编辑设备/视频方向/视频流格式/删除设备） |
+| 长按→视频方向 | 选择 0°、90°、180°、270° 画面旋转（按设备持久化） |
+| 长按→视频流格式 | 选择 MJPG 或 RTSP 视频流格式 |
 | 点击展开箭头 | 底部弹窗显示最近 20 条事件 |
 | 点击文件夹 | 进入历史录像页面 |
-| 长按→视频流格式 | 选择 MJPG 或 RTSP 视频流格式 |
 | 点击电源 | 切换摄像头电源 |
 | 点击镜头切换 | 切换摄像头镜头（多镜头设备） |
 | 全屏关闭按钮 | 退出全屏 |
+| 工具栏问号按钮 | 弹出帮助弹窗（软件说明/源码/二维码打赏/免责声明） |
+| 帮助弹窗→使用说明 | 跳转 WebView 显示使用说明页面（assets/user_manual.html） |
 
 ### 9.4 拖拽排序（待启用）
 
@@ -706,6 +713,58 @@ adb install app-debug.apk
 ---
 
 ## 13. 版本记录
+
+### v1.4.1 (2026-06-04)
+
+#### 新功能
+
+1. **视频方向旋转** — 长按菜单新增"视频方向"选项（位于"编辑设备"和"视频流格式"之间），弹出对话框支持 0°/90°/180°/270° 旋转。视频内容应用 `Modifier.rotate()`，方向配置通过 SharedPreferences 持久化，重启保持
+
+2. **横向满宽模式** — 旋转 90°/270° 时视频画面自动切换为 4:3 横向比例，卡片独占整行宽度，其余竖屏卡片保持原有双列布局规则
+
+3. **电池电量显示** — 每个卡片右上角设备名称和电源开关之间新增电池电量显示（电池图标 + 百分比），≤15% 红色、16-30% 橙色、>30% 正常色、未知显示 "--"
+
+4. **帮助弹窗** — 工具栏设置按钮右侧添加圆形问号图标，点击弹出含以下内容的帮助对话框：
+   - 软件说明（配合 HomeCam 使用）
+   - 开源说明（完全开源免费、本地传输、无后门）
+   - 自愿支持（居中展示赞赏二维码，`assets/QR/QR.jpg`）
+   - 教程 & 源码地址（可点击跳转 GitHub）
+   - 交流反馈
+   - 免责声明
+
+5. **使用说明页面** — 帮助弹窗右上角"使用说明"链接跳转全屏 WebView 页面，加载 `assets/user_manual.html`（含 4 张截图）
+
+#### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `ui/UserManualScreen.kt` | 使用说明 WebView 页面 |
+| `res/drawable/ic_help.xml` | 圆形问号图标 |
+
+#### 数据模型扩展
+
+- `CameraState` 新增 `batteryLevel: Int` 字段（-1 表示未知）
+- 服务端 `/api/status` 返回 `battery_level` 字段
+
+#### 变更文件
+
+| 文件 | 变更 |
+|------|------|
+| `ui/TEGridScreen.kt` | 添加帮助按钮 + HelpDialog 弹窗；重构 CameraGrid 行构建逻辑支持横向满宽卡片 |
+| `ui/CameraCard.kt` | 添加 BatteryIcon 绘制组件；动态 aspectRatio（竖屏 9:16 / 横屏 4:3）；添加旋转菜单和对话框 |
+| `ui/MainViewModel.kt` | 添加 `_videoRotations` StateFlow + `setVideoRotation()` + SharedPreferences 持久化；修复 `prefs` 初始化顺序 NPE |
+| `ui/MainActivity.kt` | 添加 `showUserManual` 导航和 BackHandler |
+| `WORKLOG.MD` | 更新至 v1.4.1 |
+
+#### BUG 修复
+
+1. **启动闪退** — `_videoRotations` 初始化时调用 `loadVideoRotations()` 访问 `prefs`，但 `prefs` 声明在后导致 NPE；将 `prefs` 移到 `_videoRotations` 之前
+
+#### 版本号
+
+- `versionName = "1.4.1"`
+
+---
 
 ### v1.3.1 (2026-05-28)
 
@@ -873,4 +932,4 @@ adb install app-debug.apk
 
 ---
 
-*文档结束 — Homecam-TE v1.2.0*
+*文档结束 — Homecam-TE v1.4.1*
