@@ -49,6 +49,7 @@ fun TEGridScreen(
     onShowVideoHistory: (String) -> Unit = {},
     onStreamFormatChange: (deviceId: String, format: String) -> Unit = { _, _ -> },
     onVideoRotationChange: (deviceId: String, rotation: Int) -> Unit = { _, _ -> },
+    onShowUserManual: () -> Unit = {},
     streamFormats: Map<String, String> = emptyMap(),
     videoRotations: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
@@ -137,7 +138,10 @@ fun TEGridScreen(
         }
 
         if (showHelpDialog) {
-            HelpDialog(onDismiss = { showHelpDialog = false })
+            HelpDialog(
+                onDismiss = { showHelpDialog = false },
+                onShowUserManual = onShowUserManual
+            )
         }
     }
 }
@@ -333,7 +337,7 @@ private fun CameraGrid(
 }
 
 @Composable
-private fun HelpDialog(onDismiss: () -> Unit) {
+private fun HelpDialog(onDismiss: () -> Unit, onShowUserManual: () -> Unit = {}) {
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val qrBitmap = remember {
@@ -344,7 +348,18 @@ private fun HelpDialog(onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("关于 HomeCam-TE", fontWeight = FontWeight.Bold) },
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("关于 HomeCam-TE", fontWeight = FontWeight.Bold)
+                TextButton(onClick = { onDismiss(); onShowUserManual() }) {
+                    Text("使用说明", color = Color(0xFF1976D2))
+                }
+            }
+        },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text("软件说明", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -403,7 +418,7 @@ private fun HelpDialog(onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text("知道了") }
         }
     )
 }

@@ -44,6 +44,7 @@ fun HomecamTEApp() {
     var currentScreen by remember { mutableStateOf("main") }
     var editingDeviceId by remember { mutableStateOf<String?>(null) }
     var videoHistoryDeviceId by remember { mutableStateOf<String?>(null) }
+    var showUserManual by remember { mutableStateOf(false) }
     val streamFormats by viewModel.streamFormats.collectAsState()
     val videoRotations by viewModel.videoRotations.collectAsState()
 
@@ -71,6 +72,11 @@ fun HomecamTEApp() {
     // Handle back press in video history
     BackHandler(enabled = videoHistoryDeviceId != null) {
         videoHistoryDeviceId = null
+    }
+
+    // Handle back press in user manual
+    BackHandler(enabled = showUserManual) {
+        showUserManual = false
     }
 
     // Handle back press in fullscreen
@@ -107,6 +113,9 @@ fun HomecamTEApp() {
                         )
                     }
                 }
+                showUserManual -> {
+                    UserManualScreen(onBack = { showUserManual = false })
+                }
                 currentScreen == "settings" -> {
                     SettingsScreen(
                         settings = alertSettings,
@@ -130,6 +139,7 @@ fun HomecamTEApp() {
                         onShowVideoHistory = { videoHistoryDeviceId = it },
                         onStreamFormatChange = { deviceId, format -> viewModel.setStreamFormat(deviceId, format) },
                         onVideoRotationChange = { deviceId, rotation -> viewModel.setVideoRotation(deviceId, rotation) },
+                        onShowUserManual = { showUserManual = true },
                         streamFormats = streamFormats,
                         videoRotations = videoRotations,
                         onSwitchCamera = { deviceId, cameraId ->

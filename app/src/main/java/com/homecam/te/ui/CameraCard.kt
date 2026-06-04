@@ -1,5 +1,7 @@
 package com.homecam.te.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -231,43 +233,64 @@ fun CameraCard(
                     )
                 }
 
-                // Name overlay (top-left)
-                Surface(
+                // Top bar: name + battery + power
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
+                        .fillMaxWidth()
                         .padding(4.dp),
-                    shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                ) {
-                    Text(
-                        text = cameraState.device.name.ifEmpty { cameraState.device.ip },
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // Power toggle overlay (top-right)
-                IconButton(
-                    onClick = onPowerToggle,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(32.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        shape = MaterialTheme.shapes.small,
+                        shape = RoundedCornerShape(4.dp),
                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
                     ) {
-                        Icon(
-                            Icons.Default.PowerSettingsNew,
-                            contentDescription = if (cameraState.isPoweredOn) "关闭摄像头" else "打开摄像头",
-                            tint = if (cameraState.isPoweredOn) Color(0xFF4CAF50) else Color.Gray,
-                            modifier = Modifier.padding(4.dp)
+                        Text(
+                            text = cameraState.device.name.ifEmpty { cameraState.device.ip },
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    // Battery level indicator
+                    val batteryColor = when {
+                        cameraState.batteryLevel == -1 -> Color.Gray
+                        cameraState.batteryLevel <= 15 -> Color(0xFFE53935)
+                        cameraState.batteryLevel <= 30 -> Color(0xFFF57C00)
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        BatteryIcon(level = cameraState.batteryLevel, tintColor = batteryColor)
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = if (cameraState.batteryLevel >= 0) "${cameraState.batteryLevel}%" else "--",
+                            fontSize = 11.sp,
+                            color = batteryColor
+                        )
+                    }
+
+                    // Power toggle
+                    IconButton(
+                        onClick = onPowerToggle,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                        ) {
+                            Icon(
+                                Icons.Default.PowerSettingsNew,
+                                contentDescription = if (cameraState.isPoweredOn) "关闭摄像头" else "打开摄像头",
+                                tint = if (cameraState.isPoweredOn) Color(0xFF4CAF50) else Color.Gray,
+                                modifier = Modifier.padding(4.dp)
+                            )
+                        }
                     }
                 }
 
@@ -412,5 +435,46 @@ private fun formatEventShort(type: String, label: String): String {
         "get_up" -> "有人站起来了"
         "phone" -> if (label.isNotEmpty()) "有人在玩手机（${label}）" else "有人在玩手机"
         else -> type
+    }
+}
+
+@Composable
+private fun BatteryIcon(level: Int, tintColor: Color) {
+    val bodyWidth = 12.dp
+    val bodyHeight = 6.dp
+    val tipWidth = 1.5.dp
+    val tipHeight = 3.dp
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // Battery body
+        Box(
+            modifier = Modifier
+                .width(bodyWidth)
+                .height(bodyHeight)
+                .border(1.dp, tintColor, RoundedCornerShape(1.dp))
+                .padding(0.5.dp)
+        ) {
+            if (level >= 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(
+                            when {
+                                level >= 100 -> 1f
+                                level <= 0 -> 0f
+                                else -> level / 100f
+                            }
+                        )
+                        .background(tintColor, RoundedCornerShape(0.5.dp))
+                )
+            }
+        }
+        // Battery terminal (positive tip)
+        Box(
+            modifier = Modifier
+                .width(tipWidth)
+                .height(tipHeight)
+                .background(tintColor, RoundedCornerShape(0.5.dp))
+        )
     }
 }

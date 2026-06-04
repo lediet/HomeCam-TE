@@ -111,14 +111,15 @@ class CameraRepository {
             while (isActive) {
                 delay(5000)
                 apiClient.getStatus().onSuccess { status ->
-                    Log.d("CameraRepo", "Status poll for ${device.id}: rtspEnabled=${status.rtspEnabled}, mjpgEnabled=${status.mjpgEnabled}")
+                    Log.d("CameraRepo", "Status poll for ${device.id}: rtspEnabled=${status.rtspEnabled}, mjpgEnabled=${status.mjpgEnabled}, battery=${status.batteryLevel}")
                     updateCameraState(device.id) {
                         it.copy(
                             isPoweredOn = status.cameraPowered,
                             rtspEnabled = status.rtspEnabled ?: it.rtspEnabled,
                             rtspUrl = status.rtspUrl ?: it.rtspUrl,
                             mjpgEnabled = status.mjpgEnabled ?: it.mjpgEnabled,
-                            currentCameraId = status.currentCameraId.ifEmpty { it.currentCameraId }
+                            currentCameraId = status.currentCameraId.ifEmpty { it.currentCameraId },
+                            batteryLevel = status.batteryLevel
                         )
                     }
                 }

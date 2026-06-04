@@ -29,7 +29,8 @@ data class CameraState(
     val currentCameraId: String = "",
     val rtspEnabled: Boolean = false,
     val rtspUrl: String = "",
-    val mjpgEnabled: Boolean = true
+    val mjpgEnabled: Boolean = true,
+    val batteryLevel: Int = -1
 )
 
 /**
@@ -76,6 +77,8 @@ data class StatusResponse(
     val ip: String = "",
     val port: Int = 0,
     val url: String = "",
+    @SerializedName("battery_level")
+    val batteryLevel: Int = -1,
     @SerializedName("latest_event")
     val latestEvent: String? = null,
     @SerializedName("latest_event_time")

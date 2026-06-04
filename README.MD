@@ -1,7 +1,7 @@
 # Homecam-TE v1.4.0
 
 HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeCam 设备的 MJPEG 视频流，支持事件监控、语音+振动报警和摄像头控制。
-
+软件说明书见 [用户使用手册](docs/user_manual.html) - TE终端部分。
 ## 功能
 
 - **多设备监控** — 最多同时显示多台 HomeCam 设备，自适应网格布局（1 台单列，2+ 台双列）
@@ -20,7 +20,10 @@ HomeCam 监控系统的 Android 显示终端。在局域网内接收多台 HomeC
 
 ## 截图
 
-（待补充）
+
+|          视频卡片页面                |
+|:---------------------------------:|
+| ![Live](docs/homecam-TE_card.png) | 
 
 ## 技术栈
 
@@ -68,7 +71,6 @@ Homecam-TE 依赖 HomeCam 服务器端提供的 REST API：
 | `GET /api/camera/switch` | 切换摄像头镜头 |
 | `GET /api/camera/power` | 控制摄像头电源 |
 
-> v1.2.0 已修复 UDP 自动发现（单 socket 端口绑定 + 子网定向广播）。
 
 ## 项目结构
 
@@ -104,4 +106,8 @@ com.homecam.te/
 
 ## 许可证
 
-（待定）
+[MIT License](LICENSE)
+
+---
+
+**免责声明**：本应用仅供个人安防监控使用。请遵守当地法律法规，未经他人同意不得用于偷拍等非法用途。
