@@ -5,6 +5,7 @@ app/build/
 local.properties
 
 # IDE
+.idea/
 .idea/workspace.xml
 .idea/shelf/
 *.iml
@@ -18,6 +19,7 @@ Thumbs.db
 mem*.txt
 test*.txt
 test*.py
+jiggly-wobbling-parnas.md
 
 # APK
 *.apk
