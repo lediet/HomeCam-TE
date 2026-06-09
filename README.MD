@@ -1,6 +1,6 @@
 # Homecam-TE 
 [HomeCam](https://github.com/lediet/HomeCam/) 监控系统的 Android 显示终端。在局域网内接收多台 HomeCam 设备的 MJPEG 视频流，支持事件监控、语音+振动报警和摄像头控制。
-软件说明书见 [用户使用手册](docs/user_manual.html) - TE终端部分。
+软件说明书见 [用户使用手册](https://htmlpreview.github.io/?https://github.com/lediet/HomeCam-TE/blob/main/docs/user_manual.html) - TE终端部分。
 ## 功能
 
 - **多设备监控** — 最多同时显示多台 HomeCam 设备，自适应网格布局（1 台单列，2+ 台双列）
