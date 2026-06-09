@@ -15,6 +15,7 @@ local.properties
 Thumbs.db
 
 # Temporary / scratch files
+temp/
 *.py
 mem*.txt
 test*.txt
